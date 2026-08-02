@@ -104,7 +104,6 @@ async function generateTitle(
 			apiKey: auth.apiKey,
 			headers: auth.headers,
 			env: auth.env,
-			maxTokens: 96,
 			signal,
 		},
 	);
@@ -117,12 +116,14 @@ export function registerSessionTitle(pi: ExtensionAPI, request: typeof complete 
 	let attempted = false;
 	let hasPriorUserMessage = false;
 	let controller: AbortController | undefined;
+	let pending: { sessionId: string; prompt: string; model: Model<any>; controller: AbortController } | undefined;
 
 	pi.on("session_start", (event, ctx) => {
 		controller?.abort();
 		controller = new AbortController();
 		sessionId = ctx.sessionManager.getSessionId();
 		attempted = false;
+		pending = undefined;
 		hasPriorUserMessage = ctx.sessionManager.getBranch().some(isUserMessageEntry);
 
 		if (event.reason === "fork") {
@@ -134,6 +135,7 @@ export function registerSessionTitle(pi: ExtensionAPI, request: typeof complete 
 	pi.on("session_shutdown", () => {
 		controller?.abort();
 		controller = undefined;
+		pending = undefined;
 		sessionId = undefined;
 	});
 
@@ -141,17 +143,26 @@ export function registerSessionTitle(pi: ExtensionAPI, request: typeof complete 
 		if (attempted || hasPriorUserMessage || pi.getSessionName()) return;
 		attempted = true;
 		if (!ctx.model || !controller || !sessionId || !hasMeaningfulTitleSource(event.prompt, event.images)) return;
+		pending = { sessionId, prompt: event.prompt, model: ctx.model, controller };
+	});
 
-		const requestSessionId = sessionId;
-		const requestController = controller;
-		const signals = ctx.signal ? [requestController.signal, ctx.signal] : [requestController.signal];
-		const signal = signals.length === 1 ? signals[0]! : AbortSignal.any(signals);
-		void generateTitle(event.prompt, ctx.model, ctx, signal, request)
+	pi.on("agent_settled", (_event, ctx) => {
+		const titleRequest = pending;
+		pending = undefined;
+		if (
+			!titleRequest ||
+			titleRequest.controller.signal.aborted ||
+			sessionId !== titleRequest.sessionId ||
+			pi.getSessionName()
+		) {
+			return;
+		}
+		void generateTitle(titleRequest.prompt, titleRequest.model, ctx, titleRequest.controller.signal, request)
 			.then((title) => {
 				if (
 					!title ||
-					requestController.signal.aborted ||
-					sessionId !== requestSessionId ||
+					titleRequest.controller.signal.aborted ||
+					sessionId !== titleRequest.sessionId ||
 					pi.getSessionName()
 				) {
 					return;

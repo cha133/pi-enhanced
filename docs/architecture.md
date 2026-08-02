@@ -41,7 +41,7 @@ flowchart TD
     I --> J["应用有效工具集"]
     K["model_select"] --> L["刷新 view_image/subagent 的动态 schema 或能力"]
     B --> M["session info: session_start 恢复；before_agent_start 首次捕获并注入"]
-    B --> N["session title: 首条消息异步请求当前模型；完成后持久化名称"]
+    B --> N["session title: 首条消息捕获；agent_settled 后异步请求首轮模型并持久化名称"]
 ```
 
 关键约束：
@@ -54,7 +54,7 @@ flowchart TD
 - `view_image`、`subagent` 先注册后激活；避免传入未知工具名被 pi 忽略。
 - `view_image` 在 `session_start` / `model_select` 按当前模型的 image input 能力重新注册 prompt metadata：多模态路径描述为当前模型亲自查看图片，纯文本路径明确说明会委托外挂 vision 模型并返回其描述。
 - session info 在第一轮 `before_agent_start` 才同时捕获时间与当前模型，并写入 `session-info` custom entry；后续轮次、模型切换和 session resume 始终复用固定 prompt。
-- session title 只处理没有历史用户消息、没有现有名称的新会话。第一轮 `before_agent_start` 启动不阻塞主回答的当前模型请求；返回标题经清洗和 60 字符上限处理后，通过 `setSessionName()` 持久化。请求失败或纯图片首条消息静默保留 pi 默认名称。
+- session title 只处理没有历史用户消息、没有现有名称的新会话。第一轮 `before_agent_start` 捕获 prompt 和当前模型，等 `agent_settled` 后再启动独立请求，避免与主回答竞争同一 provider 的并发额度。请求不设置模型输出 token 上限；标题长度由 prompt 和返回后的 60 字符清洗共同约束。完成后通过 `setSessionName()` 持久化，请求失败或纯图片首条消息静默保留 pi 默认名称。
 - fork 不调用标题模型：若继承到名称，则把末尾 ` (n)` 递增，或首次追加 ` (1)`；未命名 fork 保留 pi 默认名称。
 
 ## 复用边界
@@ -93,7 +93,7 @@ flowchart TD
 - accepted edits 基于同一个原始快照匹配，并在一次 write 中提交，避免逐项写盘导致后续匹配依赖前项。
 - 同一调用中的重叠 edit 不可同时应用；冲突策略见工具契约。
 - vision 与 subagent 都接受父 `AbortSignal`，并在 `finally` 中停止 timer、unsubscribe、abort/shutdown/dispose。
-- session title 请求同时绑定当前 agent signal 与 session-scoped abort controller；session shutdown、reload 或切换时取消，异步结果写入前再次核对 session id 和当前名称，避免覆盖手工 `/name` 或串写新会话。
+- session title 请求绑定 session-scoped abort controller；session shutdown、reload 或切换时取消，异步结果写入前再次核对 session id 和当前名称，避免覆盖手工 `/name` 或串写新会话。
 - subagent 可声明 `executionMode: "parallel"`，但不得共享可变的 per-call tracker。
 
 ## 子 session 组装
