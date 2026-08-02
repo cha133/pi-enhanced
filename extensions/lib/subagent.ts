@@ -19,6 +19,7 @@ import {
 	type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { createEnhancedEditTool } from "./edit.js";
+import { bindMcpTools, type McpManager } from "./mcp.js";
 import { createEnhancedShell } from "./shell.js";
 import { loadModelRoute } from "./settings.js";
 import { createViewImageTool } from "./view-image.js";
@@ -208,11 +209,13 @@ async function createChildSession(
 	model: Model<any>,
 	thinkingLevel: ThinkingLevel,
 	projectTrusted: boolean,
+	mcpManager: McpManager | undefined,
 ): Promise<AgentSession> {
 	const agentDir = getAgentDir();
 	const settingsManager = SettingsManager.create(cwd, agentDir, { projectTrusted });
 	const shell = createEnhancedShell(cwd);
 	const childExtension = (pi: ExtensionAPI) => {
+		let unbindMcp: (() => void) | undefined;
 		pi.on("session_start", (_event, ctx) => {
 			pi.registerTool(shell.tool);
 			pi.registerTool(createEnhancedEditTool(ctx.cwd));
@@ -230,7 +233,9 @@ async function createChildSession(
 			active.add("edit");
 			active.add("view_image");
 			pi.setActiveTools([...active]);
+			if (mcpManager) unbindMcp = bindMcpTools(pi, mcpManager);
 		});
+		pi.on("session_shutdown", () => unbindMcp?.());
 	};
 	const resourceLoader = new DefaultResourceLoader({
 		cwd,
@@ -245,7 +250,6 @@ async function createChildSession(
 		cwd,
 		model,
 		thinkingLevel,
-		tools: [shell.name, "write", "edit", "view_image"],
 		settingsManager,
 		resourceLoader,
 		sessionManager: SessionManager.inMemory(cwd),
@@ -268,11 +272,12 @@ async function runSubagent(
 	model: Model<any>,
 	thinkingLevel: ThinkingLevel,
 	projectTrusted: boolean,
+	mcpManager: McpManager | undefined,
 	task: string,
 	signal: AbortSignal | undefined,
 	onStatus: ((status: SubagentStatus) => void) | undefined,
 ): Promise<RunResult> {
-	const session = await createChildSession(cwd, model, thinkingLevel, projectTrusted);
+	const session = await createChildSession(cwd, model, thinkingLevel, projectTrusted, mcpManager);
 	const usage = emptyUsage();
 	const tracker = new SubagentProgressTracker();
 	let output = "";
@@ -370,6 +375,7 @@ function createParameters(advisorAvailable: boolean) {
 export function createSubagentTool(
 	available: boolean,
 	getThinkingLevel: () => ThinkingLevel,
+	getMcpManager: () => McpManager | undefined = () => undefined,
 ): Parameters<ExtensionAPI["registerTool"]>[0] {
 	return {
 		name: "subagent",
@@ -414,6 +420,7 @@ export function createSubagentTool(
 				model,
 				getThinkingLevel(),
 				ctx.isProjectTrusted(),
+				getMcpManager(),
 				input.task,
 				signal,
 				onUpdate ? (status) => onUpdate({ content: [], details: makeDetails(status) }) : undefined,

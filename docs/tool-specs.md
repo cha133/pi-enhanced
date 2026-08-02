@@ -200,3 +200,27 @@ schema：
 - 只把 final report 返回主模型；完整 JSONL transcript 存系统临时目录，路径作为内部审计元数据。
 - 传播 abort；无论成功、失败或取消，都 unsubscribe、导出 transcript、abort、发 shutdown、dispose。
 - 汇总并返回嵌套 usage。
+
+## MCP 直接工具
+
+### 暴露与命名
+
+- 每个 `tools/list` 结果直接注册为独立 Pi tool，不提供额外的 `mcp` 代理或 list/search tool。
+- 工具名为 `mcp_<规范化 server 名>_<规范化 tool 名>`，只保留字母、数字、下划线与连字符，最长 64 字符；截断和冲突后缀保持 session 内稳定。
+- tool description 标明来源 server，并保留 MCP tool 自身 description；不额外提供 prompt snippet/guidelines。
+- MCP `inputSchema` 原样作为 Pi tool parameters，由 Pi 的 raw JSON Schema 路径验证。
+
+### 调用与结果
+
+- 调用使用发现该 tool 的同一 server client，并把 Pi tool 参数作为 MCP `arguments`。
+- 父调用的 `AbortSignal` 传给 SDK `callTool()`；SDK 负责对应 transport 的取消语义。
+- MCP text/image 结果直接映射到 Pi text/image content。
+- embedded text resource 加上 URI 后作为文本返回；resource link 返回名称、描述与 URI；audio 和二进制 resource 初版只返回类型/大小说明，不把不支持的 payload 注入模型。
+- `structuredContent` 在无普通 content 时序列化为文本，同时保留在 tool details 中；MCP `isError` 转成 Pi tool error。
+
+### 动态目录
+
+- session 启动后后台连接，不阻塞用户首条消息。
+- server 初次 `tools/list` 完成后注册并激活工具；尚未完成的 server 从后续模型请求开始可用。
+- `tools/list_changed` 重新同步该 server 的完整目录；新增项激活，删除项停用，相同目录不会改变工具命名。
+- subagent 订阅同一 manager，因此继承当前及运行期间新发现的 MCP 工具，但不会创建或关闭额外连接。

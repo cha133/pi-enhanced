@@ -36,6 +36,38 @@
 - 必须含非空字符串 `provider` 与 `model`。
 - advisor 与当前主模型按 provider + model id 一起比较；相同则不暴露 advisor tier。
 
+## MCP 配置
+
+配置来源固定为：
+
+- 全局：`~/.pi/agent/mcp.json`（实现通过 `getAgentDir()` 定位）；
+- 项目：`<cwd>/.mcp.json`，仅在项目受信任时读取。
+
+两者格式相同：
+
+```json
+{
+  "mcpServers": {
+    "exa": {
+      "url": "https://mcp.exa.ai/mcp"
+    },
+    "blender": {
+      "command": "uvx",
+      "args": ["blender-mcp"],
+      "env": {}
+    }
+  }
+}
+```
+
+- 先读全局、再读项目；项目同名 server 完整替换全局项，不做字段深合并。
+- `url` 与 `command` 必须且只能出现一个。`url` 只支持绝对 HTTP(S) Streamable HTTP endpoint。
+- stdio 的 `args` 缺省为 `[]`；`env` 值必须都是字符串，并覆盖继承的 `process.env` 同名值；进程 cwd 固定为当前 Pi session cwd。
+- 初版严格拒绝未支持字段；不支持 legacy SSE、headers、OAuth、`cwd` 与配置内环境变量插值。
+- 文件不存在是正常状态。单个文件、server 配置或连接失败会报告路径/server，但不阻止其他合法 server。
+- 配置每个 session 只读一次；修改后新开 session 生效。MCP server 自己发出的 `tools/list_changed` 仍动态生效。
+- 初版不与 `pi-mcp-adapter` 协调连接所有权；若两者读取同一 `.mcp.json`，会各自连接并可能暴露重复能力，因此不应为同一配置同时启用。
+
 ### 不建议保留的配置
 
 - 不保留 `subagent.peer`：peer 的定义就是当前模型，减少配置和概念。
@@ -71,6 +103,11 @@
 | D-022 | 标题跟随首条消息语言，清洗为无 Markdown/引号的纯文本并限制为 60 个 Unicode 字符；纯图片首条消息不生成 | 用户确认 |
 | D-023 | fork 不请求模型；继承标题追加或递增末尾 ` (n)`，未命名 fork 保持 pi 默认名称 | 用户确认 |
 | D-024 | 标题模型请求不设置输出 token 上限；对强制推理模型只用提示词与结果清洗限制最终标题长度，避免 thinking 在标题文本前耗尽请求额度 | 用户确认 |
+| D-025 | MCP 初版只支持 Streamable HTTP 与 stdio，配置路径固定为全局 `~/.pi/agent/mcp.json` 和可信项目 `<cwd>/.mcp.json` | 用户确认 |
+| D-026 | MCP tools 直接作为普通模型工具暴露，不增加代理式 `mcp` list/search 步骤 | 用户确认 |
+| D-027 | MCP discovery 在 session 启动时后台执行，不阻塞首条用户请求；目录完成或变化后动态刷新工具面 | 用户确认 |
+| D-028 | 父 session 持有 MCP manager/transport，subagent 共享连接与工具目录并继续禁止递归 delegation | 用户确认 |
+| D-029 | MCP 使用官方 TypeScript SDK，原始 inputSchema 交给 Pi 的 raw JSON Schema/provider 兼容路径，只在证据表明需要时增加定向转换 | 对齐结论 |
 
 ## 待确认决策
 

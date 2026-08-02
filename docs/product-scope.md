@@ -2,7 +2,7 @@
 
 ## 定位
 
-`pi-enhanced` 是一个面向日常编码的单入口 pi 扩展包。它不追求尽可能多的 agent tools，而是在 pi 原生四工具表面上做少量、高收益、可解释的增强。
+`pi-enhanced` 是一个面向日常编码的单入口 pi 扩展包。它不追求尽可能多的 agent tools，而是在 pi 原生四工具表面上做少量、高收益、可解释的增强，并把用户克制配置的 MCP 工具直接暴露给模型。
 
 设计取向：
 
@@ -19,11 +19,11 @@
 
 ### 目标有效工具矩阵
 
-| 环境 | 原生 `bash` | 原生 `read` | 原生 `write` | 原生 `edit` | `pwsh` | 增强 `edit` | `view_image` | `subagent` |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Windows + pwsh 7 | 禁用 | 禁用 | 保留 | 被覆盖 | 启用 | 启用 | 启用 | 启用 |
-| Windows，无 pwsh 7 | 提示词被覆盖 | 禁用 | 保留 | 被覆盖 | 不注册/不启用 | 启用 | 启用 | 启用 |
-| 非 Windows | 提示词被覆盖 | 禁用 | 保留 | 被覆盖 | 不注册/不启用 | 启用 | 启用 | 启用 |
+| 环境 | 原生 `bash` | 原生 `read` | 原生 `write` | 原生 `edit` | `pwsh` | 增强 `edit` | `view_image` | `subagent` | 已配置 MCP tools |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Windows + pwsh 7 | 禁用 | 禁用 | 保留 | 被覆盖 | 启用 | 启用 | 启用 | 启用 | 后台发现后启用 |
+| Windows，无 pwsh 7 | 提示词被覆盖 | 禁用 | 保留 | 被覆盖 | 不注册/不启用 | 启用 | 启用 | 启用 | 后台发现后启用 |
+| 非 Windows | 提示词被覆盖 | 禁用 | 保留 | 被覆盖 | 不注册/不启用 | 启用 | 启用 | 启用 | 后台发现后启用 |
 
 说明：
 
@@ -32,6 +32,7 @@
 - fallback 环境保留原生 `bash` 执行实现，但用同名 override 增加 bash 文件读取与分页 guidance。
 - 图片读取与文本读取分离，统一使用 `view_image`。
 - 自定义工具只应调整自己负责的内置工具名，不得意外移除其他扩展的有效工具。
+- MCP 工具以 `mcp_<server>_<tool>` 稳定命名并直接进入模型 tools 参数，不增加代理式 list/search 调用。
 
 ## 非目标
 
@@ -41,6 +42,7 @@
 - 不实现通用多 shell 抽象；`pwsh` 只面向 Windows PowerShell 7。
 - 不让 subagent 递归生成更多 subagent。
 - 不复刻 Codex sandbox、审批策略或 unified exec 协议。
+- MCP 初版不支持 legacy SSE、OAuth、HTTP 自定义 headers、resources/prompts 或通用第三方扩展工具继承。
 
 ## 成功标准
 
@@ -50,5 +52,6 @@
 - 一次包含多个 replacements 的 `edit` 调用中，单个坏参数不会迫使模型重发已经成功的参数。
 - 多模态与文本模型都通过同一个 `view_image` schema 读取图片，文本模型 fallback 期间用户持续看到活动状态。
 - subagent 默认无配置可用；配置 advisor 后按能力动态暴露 advisor tier。
+- stdio 与 Streamable HTTP MCP server 在后台连接，工具发现不阻塞首轮，父子 session 复用连接且工具调用传播取消。
 - 所有工具返回的嵌套调用都传播取消、清理资源，并正确计入 usage。
 - 新空会话的首条文本消息不会因标题生成增加首轮等待；成功后名称持久化，手工名称、失败请求和纯图片消息均保持可预测的退化行为。

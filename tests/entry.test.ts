@@ -19,6 +19,7 @@ describe("single extension entry", () => {
 				tools.set(tool.name, tool);
 			},
 			getActiveTools: () => active,
+			getAllTools: () => [...tools.keys()].map((name) => ({ name })),
 			setActiveTools(names: string[]) {
 				active = names;
 			},
@@ -62,6 +63,7 @@ describe("single extension entry", () => {
 			for (const handler of handlers.get("model_select") ?? []) await handler({}, ctx);
 			expect((tools.get("view_image") as { description: string }).description).toContain("inspect directly");
 		} finally {
+			for (const handler of handlers.get("session_shutdown") ?? []) await handler({}, ctx);
 			await rm(cwd, { recursive: true, force: true });
 		}
 	});

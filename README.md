@@ -1,6 +1,6 @@
 # pi-enhanced
 
-`pi-enhanced` is a single-entry pi package that keeps pi's native tool surface small while improving shell-based reading, batch editing, image inspection, and focused delegation.
+`pi-enhanced` is a single-entry pi package that keeps pi's native tool surface small while improving shell-based reading, batch editing, image inspection, focused delegation, and direct MCP tool access.
 
 Requires pi `0.83.0` or newer.
 
@@ -13,6 +13,7 @@ Requires pi `0.83.0` or newer.
 | `edit` | Replaces pi's edit with partial-success batch replacement. Valid disjoint entries are applied atomically; invalid and overlapping entries are returned by index with bounded previews. |
 | `view_image` | Attaches pi-resized images directly to multimodal models or streams a compact status while a configured external vision model describes them for text-only models. |
 | `subagent` | Runs isolated peer/advisor child sessions with the effective platform toolset, compact live status, cancellation, usage accounting, and transcript export. |
+| `mcp_<server>_<tool>` | Exposes every discovered MCP tool directly to the model. The initial release supports Streamable HTTP and stdio servers; child agents reuse the parent's connections. |
 
 The built-in `read` tool is always disabled. Text is read through the effective shell; images are read through `view_image`. The built-in `write` tool remains active.
 
@@ -58,6 +59,29 @@ Trusted projects may override individual fields in `.pi/settings.json`.
 - `vision` is required only when the current model cannot consume images. It must resolve to an image-capable model already registered in pi.
 - `advisor` is optional. The advisor tier appears only when the configured model exists and differs from the current model.
 - Peer subagents always inherit the current model and thinking level.
+
+MCP servers use a separate `mcpServers` configuration. Global servers live in `~/.pi/agent/mcp.json`; trusted projects may add or replace servers by name in `<project>/.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "exa": {
+      "url": "https://mcp.exa.ai/mcp"
+    },
+    "blender": {
+      "command": "uvx",
+      "args": ["blender-mcp"],
+      "env": {}
+    }
+  }
+}
+```
+
+An entry must contain exactly one of `url` or `command`. HTTP URLs use Streamable HTTP; the initial release does not fall back to legacy SSE or implement OAuth/headers. For stdio, `args` and string-valued `env` are optional, configured environment variables override inherited process variables, and the process runs in the Pi session cwd. Project entries fully replace same-named global entries. Configuration is read once per session; restart or open a new session after editing it.
+
+MCP discovery starts in the background and never delays the first user prompt. Tools that finish loading before a request are available to that request; later arrivals are added on the following model request. Tool-list change notifications refresh the direct tool surface dynamically.
+
+This MCP client replaces the need for `pi-mcp-adapter` for the supported transports. Do not point both extensions at the same `.mcp.json`: each would open its own connection or stdio process and expose duplicate capabilities.
 
 ## Image behavior
 

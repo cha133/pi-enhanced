@@ -42,6 +42,9 @@ flowchart TD
     K["model_select"] --> L["刷新 view_image/subagent 的动态 schema 或能力"]
     B --> M["session info: session_start 恢复；before_agent_start 首次捕获并注入"]
     B --> N["session title: 首条消息异步请求当前模型；完成后持久化名称"]
+    B --> O["MCP manager: 后台读取配置并并行连接 server"]
+    O --> P["tools/list 后动态注册直接工具"]
+    P --> Q["父 session 与 child session 共享连接和目录"]
 ```
 
 关键约束：
@@ -56,6 +59,7 @@ flowchart TD
 - session info 在第一轮 `before_agent_start` 才同时捕获时间与当前模型，并写入 `session-info` custom entry；后续轮次、模型切换和 session resume 始终复用固定 prompt。
 - session title 只处理没有历史用户消息、没有现有名称的新会话。第一轮 `before_agent_start` 立即启动不阻塞主回答的当前模型请求。请求不设置模型输出 token 上限；标题长度由 prompt 和返回后的 60 字符清洗共同约束。完成后通过 `setSessionName()` 持久化，请求失败或纯图片首条消息静默保留 pi 默认名称。
 - fork 不调用标题模型：若继承到名称，则把末尾 ` (n)` 递增，或首次追加 ` (1)`；未命名 fork 保留 pi 默认名称。
+- MCP manager 在 `session_start` 立即开始异步读取配置和连接，不等待 `before_agent_start`，因此不人为延迟首轮。每个 server 完成 `tools/list` 后批量刷新工具面；`tools/list_changed` 使用 SDK 的聚合结果继续刷新。`session_shutdown` 关闭 manager 与 transport。
 
 ## 复用边界
 
@@ -65,6 +69,7 @@ flowchart TD
 - edit：复用 pi 导出的队列、路径、diff 与 renderer 能力；若部分成功算法所需函数未导出，再复制带来源注释的最小纯函数。
 - image：复用 pi 原生 read/image resize 路径或可导出的 image helpers，不重新实现图片格式解析。
 - subagent：使用 pi SDK 创建内存子 session，不通过启动子 CLI 进程模拟。
+- MCP：使用官方 TypeScript SDK 的 client、stdio transport 与 Streamable HTTP transport，不自行实现协议握手、分页、取消或 session transport。
 
 ### 允许本地实现
 
@@ -73,6 +78,7 @@ flowchart TD
 - vision fallback 的模型选择、stream 状态归约和 UI renderer。
 - 顶层配置合并与校验。
 - subagent 针对增强工具面的绑定逻辑。
+- 两层 MCP 配置读取、严格校验、覆盖合并、工具命名以及 MCP content 到 pi tool result 的适配。
 
 ## 工具激活协调器
 
@@ -103,9 +109,19 @@ flowchart TD
 - 按当前平台注册 `pwsh` 或增强提示词的原生 `bash`；
 - 启用原生 `write`，注册增强 `edit` 与动态 `view_image`；
 - 始终移除 `read` 与 `subagent`；
+- 订阅父 session 的 MCP manager，注册当前及后续发现的 MCP 直接工具；只借用连接，不拥有或关闭 transport；
 - 继承主调用选择的 peer/advisor 模型、thinking level、cwd 和 project trust。
 
 这样复用同一组工具工厂，同时从结构上阻止递归 delegation。
+
+## MCP 生命周期与工具面
+
+- manager 由父 session 独占，配置在 session 启动时读取一次；全局与可信项目配置按 server 名覆盖合并。
+- 各 server 并行连接，因此快 server 不等待慢 server。目录按照 server 名和原始 tool 名排序，减少无意义的工具顺序变化。
+- MCP 原始 JSON Schema 直接交给 pi；pi 对 raw JSON Schema 做参数校验并在 provider adapter 层处理兼容，不在本扩展构造另一套通用 schema 转换器。
+- 工具不提供 `promptSnippet` / `promptGuidelines`，信息只放在 tool name、label、description 与 parameters 中，避免重复修改 system prompt。
+- 工具删除时从 active set 移除；由于 Pi 没有 unregister API，旧 definition 可留在 registry，但不会再发送给模型。新增或变更工具从下一次模型请求起生效。
+- 调用通过同一 SDK client 路由回原 server，透传 `AbortSignal`。文本与图片原样转成 Pi content；resource 转成有来源标记的文本，audio/binary resource 返回有界的类型说明。
 
 ## 兼容性原则
 
