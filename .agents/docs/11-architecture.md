@@ -32,7 +32,7 @@ flowchart TD
     D --> E["注册/刷新 edit、view_image、subagent"]
     D --> F{"pwsh 可用?"}
     F -->|是| G["注册 pwsh"]
-    F -->|否| H["保留原生 bash"]
+    F -->|否| H["同名覆盖 bash prompt metadata，保留原生执行"]
     G --> I["基于当前 active tools 做最小增删"]
     H --> I
     I --> J["应用有效工具集"]
@@ -47,6 +47,7 @@ flowchart TD
 - 注册同名 `edit` 覆盖执行；active tools 中仍使用名字 `edit`。
 - `pwsh` 使用新名字，因此必须先注册，再把 `pwsh` 加入 active tools 并移除 `bash`。
 - `view_image`、`subagent` 先注册后激活；避免传入未知工具名被 pi 忽略。
+- `view_image` 在 `session_start` / `model_select` 按当前模型的 image input 能力重新注册 prompt metadata：多模态路径描述为当前模型亲自查看图片，纯文本路径明确说明会委托外挂 vision 模型并返回其描述。
 
 ## 复用边界
 
@@ -71,8 +72,8 @@ flowchart TD
 
 1. 读取当前 active names。
 2. 始终以增强 `edit` 接管 `edit` 名字（集合中名字不变）。
-3. 按最终决策移除 `read`。
-4. 若 pwsh 可用，移除 `bash`、加入 `pwsh`；否则移除可能残留的 `pwsh`、保留原先 `bash` 状态。
+3. 始终移除 `read`。
+4. 若 pwsh 可用，移除 `bash`、加入 `pwsh`；否则同名注册带增强 guidance 的 `bash` override、移除可能残留的 `pwsh` 并保留原先 `bash` 状态。
 5. 加入 `view_image` 与 `subagent`。
 6. 去重后一次调用 `setActiveTools()`。
 
@@ -91,4 +92,3 @@ flowchart TD
 - 对 pi 的非公开实现复制必须记录上游文件与基线版本。
 - 对公开构造器的返回 shape 做最小 wrapper，不假定未声明字段永久存在。
 - 升级 pi 时重点回归：工具 details shape、renderer 继承、extension lifecycle、SettingsManager、nested usage 与 model stream event。
-

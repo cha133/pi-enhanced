@@ -53,48 +53,22 @@
 | D-005 | 单独提供 `view_image`，兼容多模态与 vision fallback | 用户需求 |
 | D-006 | vision fallback 期间用户可看到模型实时进展 | 用户需求 |
 | D-007 | 提供 `subagent`，advisor 与 vision 采用同层配置 | 用户需求 |
+| D-008 | 单入口允许导入内部模块，package manifest 只暴露一个扩展入口 | 用户确认 |
+| D-009 | 所有平台禁用 `read`；fallback 环境静默保留并增强原生 `bash` 的 prompt metadata | 用户确认 |
+| D-010 | `view_image` 使用 path/query/detail；多模态原生消费，纯文本走明确标识的外挂 vision，prompt metadata 随模型能力变化 | 用户确认 |
+| D-011 | vision fallback 失败返回普通结果，不抛工具错误 | 用户确认 |
+| D-012 | subagent 保留 peer/advisor tier，advisor 配置扁平化，子 agent 继承平台有效工具集 | 用户确认 |
+| D-013 | 包名 `pi-enhanced`、MIT、GitHub 直接安装；当前 0.0.1，完成后发布 0.1.0；最低 pi 0.83.0 | 用户确认 |
+| D-014 | edit 重叠组全部拒绝，其他正确项合并成一次原子写盘 | 用户确认 |
+| D-015 | edit rejected 仅回传索引、错误信息和明确标注为不完整的有界预览 | 用户确认 |
+| D-016 | vision fallback 使用与 read vision/subagent 一致的紧凑单行实时状态 | 用户确认 |
+| D-017 | `view_image.detail` 只控制分析深度；图片沿用 pi 自动等比缩放，不提供原始分辨率开关 | 用户确认 |
+| D-018 | pwsh 7 加载用户 profile 并注入 `TERM=dumb` | 用户确认 |
+| D-019 | edit 的参数级错误局部拒绝；即使全部 rejected 也返回普通结果，只有 I/O、取消或内部错误抛 tool error | 对齐结论 |
 
 ## 待确认决策
 
-### Q-001：单入口是否允许内部模块
-
-建议：允许。package manifest 只声明 `extensions/pi-enhanced.ts`，内部 `lib/` 不构成额外扩展入口。
-
-### Q-002：fallback bash 环境是否禁用 `read`
-
-建议：所有平台都禁用 `read`。理由是产品工具心智始终保持“shell 读文本，view_image 读图”；代价是非 Windows 模型必须可靠掌握 bash 文本读取。若只在 pwsh 环境禁用 read，跨平台工具表面会变化更大，但 fallback 体验更接近 pi 原生。
-
-### Q-003：没有 pwsh 7 时是否提示
-
-建议：正常静默 fallback，不抛错；TUI 可选只显示一次 muted 通知。默认静默最符合“否则还是用默认 bash”。
-
-### Q-004：edit 重叠冲突如何取舍
-
-建议：重叠组全部拒绝，其他不重叠 edits 正常应用。不要按数组先后选择赢家，否则参数排序会改变文件结果。
-
-### Q-005：edit applied 为 0 是否算错误
-
-建议：不算工具错误。只要文件可访问且分类完成，就返回 rejected 明细；I/O、abort 与内部一致性错误才抛出。
-
-### Q-006：vision “实时看到回复”的展示强度
-
-建议：沿用 `pi-extensions`，TUI 单行展示最新 reasoning/reply 摘要并节流，最终文本正常写入工具结果。不永久记录每个中间 token。
-
-### Q-007：subagent 配置收敛程度
-
-建议：peer 固定继承当前模型，仅保留顶层可选 `advisor`。工具 tier 语义不变：默认 peer，配置有效时才出现 advisor。
-
-### Q-008：subagent 的工具集合
-
-建议：子 session 加载同一个 `pi-enhanced` 入口，再明确移除 `subagent`，从而按平台获得 `pwsh` 或 bash、增强 `edit`、`view_image` 与原生 `write`。需要验证扩展绑定不会递归注册/激活 subagent。
-
-### Q-009：PowerShell profile
-
-参考实现通过 `TERM=dumb` 让用户 profile 自行短路交互逻辑，但仍加载 profile。建议保留兼容性并做无 profile 依赖的测试；若目标是完全可复现，则改用 `-NoProfile`，代价是失去用户环境初始化。需确认偏好。
-
-### Q-010：公开包元数据
-
-需确认 npm 包名、repository URL、license，以及是否锁定 pi `0.83.x` 或使用宽 peer dependency。
+无。实现中出现新的兼容性或产品取舍时，从 `Q-011` 继续编号。
 
 ## 对齐后动作
 
@@ -104,4 +78,3 @@
 2. 从本节移除对应问题。
 3. 更新工具矩阵/契约。
 4. 更新 [01-state.md](./01-state.md) 的待对齐清单。
-

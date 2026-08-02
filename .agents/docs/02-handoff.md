@@ -17,6 +17,19 @@
 - 移植 `pi-extensions` 的 `subagent`；模型配置与 `vision` 同处顶层，使用 `advisor` 而不是 `subagent.advisor`。
 - 当前阶段只写 `.agents/docs/`，写完后继续在文档上对齐。
 
+## 2026-08-02 已追加确认
+
+- 单入口允许导入内部模块。
+- 所有平台始终禁用 `read`。没有 pwsh 7 时静默保留并覆盖原生 `bash`，为它补充 bash 文本读取与分页 guidance。
+- `view_image` 使用 `path`、可选 `query`、可选 `detail`；多模态模型原生消费 image content，纯文本模型明确知道结果来自外挂 vision 模型。工具 prompt metadata 随当前模型能力刷新。
+- vision fallback 失败返回清晰普通结果，不抛工具错误。
+- subagent 完整保留 peer/advisor tier，只有 advisor 模型配置扁平化为顶层 `advisor`；子 agent 继承运行平台的有效主工具集。
+- 包名 `pi-enhanced`，MIT，仅通过 GitHub 安装；当前开发版 `0.0.1`，完成后发布 `0.1.0`，最低支持 pi `0.83.0`。
+- edit 的重叠组全部拒绝，其他正确项合并成一次原子写盘；rejected 项只返回索引、错误和明确标注为不完整的有界预览。
+- vision fallback 沿用 `pi-extensions` read/subagent 风格，在 TUI 显示紧凑单行实时状态。
+- `view_image.detail` 只控制分析深度；图片统一沿用 pi 的自动等比缩放，不提供原始分辨率开关。
+- pwsh 7 加载用户 profile，并注入 `TERM=dumb`，与目标 Codex exec_command 体验对齐。
+
 ## 已核实的实现事实
 
 - 当前相邻 `../pi` 版本为 `0.83.0`。
@@ -30,14 +43,14 @@
 
 - 一个公开入口 `extensions/pi-enhanced.ts`，内部可拆到 `extensions/lib/`；package manifest 只列出该入口。
 - 在 `session_start` 统一注册工具并计算有效工具集；在 `model_select` 只刷新与模型能力/schema 有关的工具。
-- `read` 始终禁用，因为 `pwsh`/fallback bash 承担文本读取，`view_image` 承担图片读取。此点需用户确认。
-- `edit` 先对原始快照独立分类，再剔除相互重叠项，对所有 accepted edit 一次写盘；结果返回原输入索引的 applied/rejected 列表。
+- `read` 始终禁用，因为 `pwsh`/fallback bash 承担文本读取，`view_image` 承担图片读取。
+- `edit` 先对原始快照独立分类；重叠组全部拒绝，对其余 accepted edit 一次写盘；结果返回原输入索引的 applied/rejected 列表与有界错误预览。
 - `view_image` 原生路径返回 image content；fallback 路径返回 vision 文本和 usage。
-- 配置暂定：顶层 `vision` 与顶层 `advisor`；peer 始终继承当前模型，不再配置。
+- 配置采用顶层 `vision` 与顶层 `advisor`；peer 始终继承当前模型，不再配置。
 
 ## 下一步
 
-先与用户逐项确认 [13-configuration-and-decisions.md](./13-configuration-and-decisions.md) 的开放问题，再更新文档状态；未对齐前不要创建实现代码。
+设计对齐已完成。下一会话从建立 package 骨架、测试框架和单入口开始，再按 activation → shell → edit → view_image → subagent 的顺序实现。
 
 ## 关键参考
 
@@ -50,4 +63,3 @@
 - vision fallback：`../../../pi-extensions/extensions/lib/read.ts`
 - subagent：`../../../pi-extensions/extensions/subagent.ts`
 - Codex PowerShell safe commands：`../../../codex/codex-rs/shell-command/src/command_safety/windows_safe_commands.rs`
-
