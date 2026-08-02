@@ -43,6 +43,10 @@ export interface SubagentDetails {
 	truncated?: boolean;
 }
 
+export function formatSubagentStatus(status: SubagentStatus): string {
+	return `${status.phase}: ${status.summary}`;
+}
+
 interface SessionEvent {
 	type?: string;
 	toolCallId?: string;
@@ -148,7 +152,7 @@ export class SubagentProgressTracker {
 	private active = new Map<string, string>();
 	private thinking = "";
 	private reply = "";
-	private status: SubagentStatus = { phase: "starting", summary: "Starting..." };
+	private status: SubagentStatus = { phase: "starting", summary: "subagent..." };
 
 	get current(): SubagentStatus {
 		return this.status;
@@ -157,7 +161,7 @@ export class SubagentProgressTracker {
 	handle(event: SessionEvent): SubagentStatus | undefined {
 		let next: SubagentStatus | undefined;
 		if (event.type === "message_start" && event.message?.role === "assistant") {
-			next = { phase: "starting", summary: "Thinking..." };
+			next = { phase: "starting", summary: "model..." };
 		}
 		if (event.type === "tool_execution_start") {
 			const summary = toolActivity(event.toolName, event.args);
@@ -168,17 +172,17 @@ export class SubagentProgressTracker {
 			if (event.toolCallId) this.active.delete(event.toolCallId);
 			next = this.active.size > 0
 				? { phase: "tool", summary: [...this.active.values()].at(-1)! }
-				: { phase: "starting", summary: "Continuing..." };
+				: { phase: "starting", summary: "continuing..." };
 		}
 		const delta = event.assistantMessageEvent?.delta;
 		if (event.type === "message_update" && delta) {
 			if (event.assistantMessageEvent?.type === "thinking_delta") {
 				this.thinking += delta;
-				next = { phase: "reasoning", summary: compact(this.thinking, "Thinking...") };
+				next = { phase: "reasoning", summary: compact(this.thinking, "model...") };
 			}
 			if (event.assistantMessageEvent?.type === "text_delta") {
 				this.reply += delta;
-				next = { phase: "replying", summary: compact(this.reply, "Replying...") };
+				next = { phase: "replying", summary: compact(this.reply, "model...") };
 			}
 		}
 		if (!next || (next.phase === this.status.phase && next.summary === this.status.summary)) return undefined;
@@ -417,8 +421,11 @@ export function createSubagentTool(
 			const raw = result.output || result.errorMessage || "(subagent returned no text)";
 			const output = await truncateOutput(raw);
 			const status: SubagentStatus = failed
-				? { phase: result.stopReason === "aborted" ? "cancelled" : "failed", summary: compact(result.errorMessage, "Failed") }
-				: { phase: "finished", summary: `Finished · ${model.id}` };
+				? {
+						phase: result.stopReason === "aborted" ? "cancelled" : "failed",
+						summary: compact(result.errorMessage, result.stopReason === "aborted" ? "aborted" : "subagent failed"),
+					}
+				: { phase: "finished", summary: model.id };
 			const transcript = result.transcriptPath
 				? `\n\n[Full subagent transcript: ${result.transcriptPath}]`
 				: result.transcriptError
@@ -444,13 +451,17 @@ export function createSubagentTool(
 				},
 			]);
 		},
-		renderResult(result, options, theme) {
+		renderResult(result, options, theme, context) {
 			const details = result.details as SubagentDetails | undefined;
-			const status = details?.status;
-			const color = status?.phase === "failed" ? "error" : status?.phase === "finished" ? "success" : "muted";
+			const resultText = result.content.find((part) => part.type === "text")?.text;
+			const status = details?.status ?? {
+				phase: options.isPartial ? "starting" : context.isError || resultText?.startsWith("[Subagent failed") ? "failed" : "finished",
+				summary: options.isPartial ? "subagent..." : resultText?.startsWith("[Subagent failed") ? compact(resultText, "subagent failed") : "subagent",
+			} satisfies SubagentStatus;
+			const color = status.phase === "failed" ? "error" : status.phase === "cancelled" ? "warning" : status.phase === "finished" ? "success" : "muted";
 			return new OneLine([
 				{
-					text: status?.summary ?? (options.isPartial ? "Running..." : "Finished"),
+					text: formatSubagentStatus(status),
 					style: (text) => theme.fg(color, text),
 				},
 			]);

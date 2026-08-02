@@ -167,7 +167,7 @@ Rejected edits:
 1. 读取顶层 `vision` 配置并解析已注册模型。
 2. 验证 fallback 模型声明 image input，并获取认证信息；发送与原生路径相同的预处理图片。
 3. 调用 `stream()`，消息包含 query 与 image content。
-4. 把 `start`、`thinking_delta`、`text_delta` 归约成用户可见的单行状态，经 `onUpdate` 约 100 ms 限流发布。
+4. 把 `start`、`thinking_delta`、`text_delta` 归约成用户可见的单行状态，经 `onUpdate` 约 100 ms 限流发布；阶段使用 `reasoning: `、`replying: `、`finished: ` 等小写前缀。
 5. 最终只把 vision 模型文本回复返回给主模型，并按 pi 上限截断。
 6. 返回嵌套模型 usage；传播 abort。
 
@@ -196,7 +196,7 @@ Rejected edits:
 
 - 直接通过 pi SDK 创建隔离的内存 session，并绑定所需扩展。
 - 子 session 工具集合必须在编码前定案；原则上与父 session 的有效增强工具面一致，但排除 `subagent`。
-- 将 reasoning、tool activity、reply 归约为紧凑状态，通过 `onUpdate` 展示。
+- 将 reasoning、tool activity、reply 归约为紧凑状态，通过 `onUpdate` 展示；阶段使用小写前缀，并在终态显示 `finished: `。
 - 只把 final report 返回主模型；完整 JSONL transcript 存系统临时目录，路径作为内部审计元数据。
 - 传播 abort；无论成功、失败或取消，都 unsubscribe、导出 transcript、abort、发 shutdown、dispose。
 - 汇总并返回嵌套 usage。

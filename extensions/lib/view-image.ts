@@ -38,7 +38,7 @@ export interface ViewImageInput {
 	detail?: ImageDetail;
 }
 
-export type VisionPhase = "sending" | "thinking" | "reasoning" | "replying";
+export type VisionPhase = "sending" | "thinking" | "reasoning" | "replying" | "finished" | "failed" | "cancelled";
 
 export interface VisionStatus {
 	phase: VisionPhase;
@@ -50,6 +50,10 @@ export interface ViewImageDetails extends ReadToolDetails {
 	delegated?: boolean;
 	provider?: string;
 	model?: string;
+}
+
+export function formatVisionStatus(status: VisionStatus): string {
+	return `${status.phase}: ${status.summary}`;
 }
 
 interface ModelWithInputs {
@@ -74,7 +78,7 @@ function appendBounded(current: string, delta: string): string {
 export class VisionProgressTracker {
 	private thinking = "";
 	private reply = "";
-	private status: VisionStatus = { phase: "sending", summary: "Sending image to vision model..." };
+	private status: VisionStatus = { phase: "sending", summary: "image to vision model..." };
 
 	get current(): VisionStatus {
 		return this.status;
@@ -82,14 +86,14 @@ export class VisionProgressTracker {
 
 	handle(event: AssistantMessageEvent): VisionStatus | undefined {
 		let next: VisionStatus | undefined;
-		if (event.type === "start") next = { phase: "thinking", summary: "Vision model is thinking..." };
+		if (event.type === "start") next = { phase: "thinking", summary: "vision model..." };
 		if (event.type === "thinking_delta") {
 			this.thinking = appendBounded(this.thinking, event.delta);
-			next = { phase: "reasoning", summary: compactLine(this.thinking, "Vision model is thinking...") };
+			next = { phase: "reasoning", summary: compactLine(this.thinking, "vision model...") };
 		}
 		if (event.type === "text_delta") {
 			this.reply = appendBounded(this.reply, event.delta);
-			next = { phase: "replying", summary: compactLine(this.reply, "Vision model is replying...") };
+			next = { phase: "replying", summary: compactLine(this.reply, "vision model...") };
 		}
 		if (!next || (next.phase === this.status.phase && next.summary === this.status.summary)) return undefined;
 		this.status = next;
@@ -98,9 +102,10 @@ export class VisionProgressTracker {
 }
 
 function failure(message: string) {
+	const phase: VisionPhase = message === "cancelled" ? "cancelled" : "failed";
 	return {
 		content: [{ type: "text" as const, text: `[Vision fallback failed: ${message}]` }],
-		details: undefined,
+		details: { visionStatus: { phase, summary: message } } satisfies ViewImageDetails,
 	};
 }
 
@@ -202,6 +207,7 @@ async function delegateVision(
 		return {
 			content: [{ type: "text" as const, text: truncation.content }],
 			details: {
+				visionStatus: { phase: "finished", summary: `Vision response · ${model.id}` },
 				delegated: true,
 				provider: model.provider,
 				model: model.id,
@@ -271,13 +277,15 @@ export function createViewImageTool(
 			const details = result.details as ViewImageDetails | undefined;
 			if (options.isPartial && details?.visionStatus) {
 				return new OneLine([
-					{ text: details.visionStatus.summary, style: (text) => theme.fg("muted", text) },
+					{ text: formatVisionStatus(details.visionStatus), style: (text) => theme.fg("muted", text) },
 				]);
 			}
+			const status: VisionStatus = details?.visionStatus ?? { phase: "finished", summary: "Image attached" };
+			const color = status.phase === "failed" ? "error" : status.phase === "cancelled" ? "warning" : "success";
 			return new OneLine([
 				{
-					text: details?.delegated ? `Vision response · ${details.model}` : "Image attached",
-					style: (text) => theme.fg("success", text),
+					text: formatVisionStatus(status),
+					style: (text) => theme.fg(color, text),
 				},
 			]);
 		},
