@@ -100,8 +100,6 @@ describe("session title lifecycle", () => {
 
 		expect(result).toBeUndefined();
 		expect(h.names).toEqual([]);
-		expect(resolveRequest).toBeUndefined();
-		h.handlers.get("agent_settled")![0]({}, h.ctx);
 		await flushPromises();
 		resolveRequest(assistant("修复登录超时"));
 		await flushPromises();
@@ -116,30 +114,12 @@ describe("session title lifecycle", () => {
 		registerSessionTitle(h.pi, request as any);
 		h.handlers.get("session_start")![0]({ reason: "startup" }, h.ctx);
 		h.handlers.get("before_agent_start")![0]({ prompt: "Fix auth", images: undefined }, h.ctx);
-		h.handlers.get("agent_settled")![0]({}, h.ctx);
 		await flushPromises();
 		h.setName("Manual title");
 		resolveRequest(assistant("Generated title"));
 		await flushPromises();
 		expect(h.currentName).toBe("Manual title");
 		expect(h.names).toEqual([]);
-	});
-
-	test("does not start the model request when manually named before settling", async () => {
-		const h = harness();
-		let requests = 0;
-		const request = () => {
-			requests += 1;
-			return Promise.resolve(assistant("Generated title"));
-		};
-		registerSessionTitle(h.pi, request as any);
-		h.handlers.get("session_start")![0]({ reason: "startup" }, h.ctx);
-		h.handlers.get("before_agent_start")![0]({ prompt: "Fix auth", images: undefined }, h.ctx);
-		h.setName("Manual title");
-		h.handlers.get("agent_settled")![0]({}, h.ctx);
-		await flushPromises();
-		expect(requests).toBe(0);
-		expect(h.currentName).toBe("Manual title");
 	});
 
 	test("aborts a pending request on session shutdown", async () => {
@@ -152,7 +132,6 @@ describe("session title lifecycle", () => {
 		registerSessionTitle(h.pi, request as any);
 		h.handlers.get("session_start")![0]({ reason: "startup" }, h.ctx);
 		h.handlers.get("before_agent_start")![0]({ prompt: "Fix auth", images: undefined }, h.ctx);
-		h.handlers.get("agent_settled")![0]({}, h.ctx);
 		await flushPromises();
 		h.handlers.get("session_shutdown")![0]({ reason: "quit" }, h.ctx);
 		expect(requestSignal?.aborted).toBe(true);
@@ -163,7 +142,6 @@ describe("session title lifecycle", () => {
 		registerSessionTitle(h.pi, (() => Promise.reject(new Error("provider failed"))) as any);
 		h.handlers.get("session_start")![0]({ reason: "startup" }, h.ctx);
 		const result = h.handlers.get("before_agent_start")![0]({ prompt: "Fix auth", images: undefined }, h.ctx);
-		h.handlers.get("agent_settled")![0]({}, h.ctx);
 		await flushPromises();
 		expect(result).toBeUndefined();
 		expect(h.names).toEqual([]);

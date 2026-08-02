@@ -18,7 +18,7 @@ The built-in `read` tool is always disabled. Text is read through the effective 
 
 The extension also records the first user message's timestamp and first-turn model as fixed session metadata. It reuses that same information after later model switches and when the session is resumed.
 
-For a new empty session, the first text prompt is captured and, after its agent run settles, starts a non-blocking request to the same model for a concise session name. Manual names are never overwritten, failures and pure-image prompts keep pi's default name, and forks increment an inherited trailing ` (n)` suffix without another model request.
+For a new empty session, the first text prompt immediately starts a non-blocking request to the current model for a concise session name. Manual names are never overwritten, failures and pure-image prompts keep pi's default name, and forks increment an inherited trailing ` (n)` suffix without another model request.
 
 ## Install
 
