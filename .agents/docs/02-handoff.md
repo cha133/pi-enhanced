@@ -48,9 +48,17 @@
 - `view_image` 原生路径返回 image content；fallback 路径返回 vision 文本和 usage。
 - 配置采用顶层 `vision` 与顶层 `advisor`；peer 始终继承当前模型，不再配置。
 
+## 当前实现状态
+
+- package 仅公开 `extensions/pi-enhanced.ts`，内部实现位于 `extensions/lib/`。
+- 已实现 activation、shell、edit、view_image、settings 与 subagent。
+- 子 agent 不递归加载公开入口，而由隐藏 inline child extension 注册同平台 shell、write、enhanced edit 与 view_image；明确排除 subagent。
+- 测试覆盖激活集合、pwsh 7 探测和真实执行、fallback bash guidance、edit 分类/重叠/fuzzy/BOM/CRLF、配置合并、动态 view prompt、vision/subagent 状态归约和单入口注册。
+- `npm run typecheck`、`npm test`、`npm pack --dry-run` 和 `npm audit --omit=dev` 已通过。
+
 ## 下一步
 
-设计对齐已完成。下一会话从建立 package 骨架、测试框架和单入口开始，再按 activation → shell → edit → view_image → subagent 的顺序实现。
+用真实已认证模型分别验收多模态 view_image、纯文本 vision fallback、peer/advisor subagent。验收完成后修复问题并 bump `0.1.0`。
 
 ## 关键参考
 

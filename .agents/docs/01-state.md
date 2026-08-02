@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-`设计已对齐，等待开始实现`。设计基线已提交；当前尚未创建包结构或实现代码。
+`0.0.1 首版实现完成，等待真实模型验收`。单入口、四个增强工具、测试和用户 README 已落地。
 
 ## 已完成
 
@@ -20,17 +20,25 @@
 
 ## 实现待办
 
-- [ ] 建立 `package.json`、`tsconfig.json`、单入口与内部源码布局。
-- [ ] 编写平台探测与 PowerShell 7 版本验证。
-- [ ] 实现工具激活协调器，在 session/model 生命周期中稳定应用有效工具集。
-- [ ] 实现 `pwsh`，并在 fallback 环境覆盖原生 `bash` 的 prompt metadata；两者均复用 pi shell 执行、截断、取消和渲染能力。
-- [ ] 合并通用 shell guidance，以及各自适用的 PowerShell / bash 文件分段读取指导。
-- [ ] 实现可部分成功的批量 `edit`，保留 pi 的换行、BOM 和 Unicode/fuzzy 归一化语义。
-- [ ] 实现 `view_image` 原生多模态路径与流式 vision fallback。
-- [ ] 移植并收敛 `subagent`，适配扁平配置和增强工具表面。
-- [ ] 为工具注册、平台矩阵、部分 edit、vision streaming、配置合并和取消清理补测试。
-- [ ] 编写用户 README、配置示例和安装说明。
-- [ ] 运行 typecheck、单元测试，并用真实 pi 做 Windows 与 fallback 冒烟测试。
+- [x] 建立 `package.json`、`tsconfig.json`、单入口与内部源码布局。
+- [x] 编写平台探测与 PowerShell 7 版本验证。
+- [x] 实现工具激活协调器，在 session/model 生命周期中稳定应用有效工具集。
+- [x] 实现 `pwsh`，并在 fallback 环境覆盖原生 `bash` 的 prompt metadata；两者均复用 pi shell 执行、截断、取消和渲染能力。
+- [x] 合并通用 shell guidance，以及各自适用的 PowerShell / bash 文件分段读取指导。
+- [x] 实现可部分成功的批量 `edit`，保留 pi 的换行、BOM 和 Unicode/fuzzy 归一化语义。
+- [x] 实现 `view_image` 原生多模态路径与流式 vision fallback。
+- [x] 移植并收敛 `subagent`，适配扁平配置和增强工具表面。
+- [x] 为工具注册、平台矩阵、部分 edit、vision/subagent 状态和配置合并补测试。
+- [x] 编写用户 README、配置示例和安装说明。
+- [x] 运行 typecheck、单元测试、package dry-run、真实文件 edit 与 Windows pwsh 冒烟。
+
+## 发布前待办
+
+- [ ] 在已认证的多模态主模型上验收 `view_image` 原生图片返回。
+- [ ] 在纯文本主模型 + 已配置 vision 模型上验收 fallback、usage 与取消。
+- [ ] 在 peer/advisor 各跑一次真实 subagent，验收 child 工具集、transcript 和取消清理。
+- [ ] 在非 Windows 环境做一次原生 bash 实际执行验收；当前已有平台无关单元测试。
+- [ ] 根据验收修复问题，版本从 `0.0.1` bump 到 `0.1.0` 并打 GitHub tag。
 
 ## 风险
 

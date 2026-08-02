@@ -1,0 +1,43 @@
+{
+  "name": "pi-enhanced",
+  "version": "0.0.1",
+  "description": "A minimal, practical enhancement suite for pi's native coding tools",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "coding-agent"
+  ],
+  "files": [
+    "extensions",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/pi-enhanced.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-agent-core": ">=0.83.0",
+    "@earendil-works/pi-ai": ">=0.83.0",
+    "@earendil-works/pi-coding-agent": ">=0.83.0",
+    "@earendil-works/pi-tui": ">=0.83.0",
+    "typebox": ">=1.3.7"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-agent-core": "0.83.0",
+    "@earendil-works/pi-ai": "0.83.0",
+    "@earendil-works/pi-coding-agent": "0.83.0",
+    "@earendil-works/pi-tui": "0.83.0",
+    "@types/bun": "^1.2.23",
+    "@types/node": "^26.1.1",
+    "typebox": "^1.3.7",
+    "typescript": "5.9.3"
+  }
+}

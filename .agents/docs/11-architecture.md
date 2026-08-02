@@ -87,6 +87,17 @@ flowchart TD
 - vision 与 subagent 都接受父 `AbortSignal`，并在 `finally` 中停止 timer、unsubscribe、abort/shutdown/dispose。
 - subagent 可声明 `executionMode: "parallel"`，但不得共享可变的 per-call tracker。
 
+## 子 session 组装
+
+子 agent 使用 `createAgentSession()` 和内存 `SessionManager`。为避免公开入口递归注册 `subagent`，child resource loader 禁用常规扩展发现，再加载一个隐藏 inline extension：
+
+- 按当前平台注册 `pwsh` 或增强提示词的原生 `bash`；
+- 启用原生 `write`，注册增强 `edit` 与动态 `view_image`；
+- 始终移除 `read` 与 `subagent`；
+- 继承主调用选择的 peer/advisor 模型、thinking level、cwd 和 project trust。
+
+这样复用同一组工具工厂，同时从结构上阻止递归 delegation。
+
 ## 兼容性原则
 
 - 对 pi 的非公开实现复制必须记录上游文件与基线版本。
