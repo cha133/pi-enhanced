@@ -23,6 +23,8 @@ describe("single extension entry", () => {
 				active = names;
 			},
 			getThinkingLevel: () => "medium",
+			getSessionName: () => undefined,
+			setSessionName: () => {},
 			appendEntry(customType: string, data: unknown) {
 				entries.push({ type: "custom", customType, data });
 			},
@@ -35,6 +37,7 @@ describe("single extension entry", () => {
 			sessionManager: {
 				getSessionId: () => "session-1",
 				getEntries: () => entries,
+				getBranch: () => entries,
 			},
 		} as any;
 
