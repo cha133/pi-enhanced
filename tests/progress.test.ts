@@ -13,13 +13,11 @@ describe("nested model progress", () => {
 		expect(formatVisionStatus({ phase: "reasoning", summary: "checking pixels" })).toBe(
 			"reasoning: checking pixels",
 		);
-		expect(formatVisionStatus({ phase: "finished", summary: "Vision response · kimi-k3" })).toBe(
-			"finished: Vision response · kimi-k3",
-		);
+		expect(formatVisionStatus({ phase: "finished", summary: "kimi-k3" })).toBe("finished · kimi-k3");
 		expect(formatSubagentStatus({ phase: "replying", summary: "writing report" })).toBe(
 			"replying: writing report",
 		);
-		expect(formatSubagentStatus({ phase: "finished", summary: "glm-5.2" })).toBe("finished: glm-5.2");
+		expect(formatSubagentStatus({ phase: "finished", summary: "glm-5.2" })).toBe("finished · glm-5.2");
 	});
 
 	test("reduces vision stream events to one current status", () => {

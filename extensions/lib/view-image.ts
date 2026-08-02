@@ -53,6 +53,7 @@ export interface ViewImageDetails extends ReadToolDetails {
 }
 
 export function formatVisionStatus(status: VisionStatus): string {
+	if (status.phase === "finished") return `finished · ${status.summary}`;
 	return `${status.phase}: ${status.summary}`;
 }
 
@@ -207,7 +208,7 @@ async function delegateVision(
 		return {
 			content: [{ type: "text" as const, text: truncation.content }],
 			details: {
-				visionStatus: { phase: "finished", summary: `Vision response · ${model.id}` },
+				visionStatus: { phase: "finished", summary: model.id },
 				delegated: true,
 				provider: model.provider,
 				model: model.id,

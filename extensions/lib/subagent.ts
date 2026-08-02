@@ -44,6 +44,7 @@ export interface SubagentDetails {
 }
 
 export function formatSubagentStatus(status: SubagentStatus): string {
+	if (status.phase === "finished") return `finished · ${status.summary}`;
 	return `${status.phase}: ${status.summary}`;
 }
 
