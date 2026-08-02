@@ -65,6 +65,7 @@
 | D-017 | `view_image.detail` 只控制分析深度；图片沿用 pi 自动等比缩放，不提供原始分辨率开关 | 用户确认 |
 | D-018 | pwsh 7 加载用户 profile 并注入 `TERM=dumb` | 用户确认 |
 | D-019 | edit 的参数级错误局部拒绝；即使全部 rejected 也返回普通结果，只有 I/O、取消或内部错误抛 tool error | 对齐结论 |
+| D-020 | 移植 `pi-extensions` session info，在首轮固定时间与模型并跨模型切换、session resume 复用 | 用户需求 |
 
 ## 待确认决策
 

@@ -52,6 +52,7 @@
 
 - package 仅公开 `extensions/pi-enhanced.ts`，内部实现位于 `extensions/lib/`。
 - 已实现 activation、shell、edit、view_image、settings 与 subagent。
+- 已实现 session info：在首轮 `before_agent_start` 固定时间与模型，写入 custom session entry，并在模型切换和恢复后复用。
 - 子 agent 不递归加载公开入口，而由隐藏 inline child extension 注册同平台 shell、write、enhanced edit 与 view_image；明确排除 subagent。
 - 测试覆盖激活集合、pwsh 路径探测和真实工具执行、fallback bash guidance、edit 分类/重叠/fuzzy/BOM/CRLF、配置合并、动态 view prompt、vision/subagent 状态归约和单入口注册。
 - `npm run typecheck`、`npm test`、`npm pack --dry-run` 和 `npm audit --omit=dev` 已通过。
@@ -70,4 +71,5 @@
 - shell guidance：`../../../pi-extensions/extensions/shell-guidance.ts`
 - vision fallback：`../../../pi-extensions/extensions/lib/read.ts`
 - subagent：`../../../pi-extensions/extensions/subagent.ts`
+- session info：`../../../pi-extensions/extensions/session-info.ts`
 - Codex PowerShell safe commands：`../../../codex/codex-rs/shell-command/src/command_safety/windows_safe_commands.rs`

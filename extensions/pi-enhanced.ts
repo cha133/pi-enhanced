@@ -2,10 +2,13 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { activateEnhancedTools } from "./lib/activation.js";
 import { createEnhancedEditTool } from "./lib/edit.js";
 import { createEnhancedShell, type ShellRegistration } from "./lib/shell.js";
+import { registerSessionInfo } from "./lib/session-info.js";
 import { createSubagentTool, isAdvisorAvailable } from "./lib/subagent.js";
 import { createViewImageTool } from "./lib/view-image.js";
 
 export default function piEnhanced(pi: ExtensionAPI): void {
+	registerSessionInfo(pi);
+
 	let shell: ShellRegistration | undefined;
 	let cwd: string | undefined;
 

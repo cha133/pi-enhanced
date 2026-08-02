@@ -14,6 +14,7 @@ pi-enhanced/
 │       ├── edit.ts
 │       ├── view-image.ts
 │       ├── subagent.ts
+│       ├── session-info.ts
 │       └── settings.ts
 ├── tests/
 ├── package.json
@@ -37,6 +38,7 @@ flowchart TD
     H --> I
     I --> J["应用有效工具集"]
     K["model_select"] --> L["刷新 view_image/subagent 的动态 schema 或能力"]
+    B --> M["session info: session_start 恢复；before_agent_start 首次捕获并注入"]
 ```
 
 关键约束：
@@ -48,6 +50,7 @@ flowchart TD
 - `pwsh` 使用新名字，因此必须先注册，再把 `pwsh` 加入 active tools 并移除 `bash`。
 - `view_image`、`subagent` 先注册后激活；避免传入未知工具名被 pi 忽略。
 - `view_image` 在 `session_start` / `model_select` 按当前模型的 image input 能力重新注册 prompt metadata：多模态路径描述为当前模型亲自查看图片，纯文本路径明确说明会委托外挂 vision 模型并返回其描述。
+- session info 在第一轮 `before_agent_start` 才同时捕获时间与当前模型，并写入 `session-info` custom entry；后续轮次、模型切换和 session resume 始终复用固定 prompt。
 
 ## 复用边界
 

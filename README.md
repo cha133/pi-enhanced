@@ -16,6 +16,8 @@ Requires pi `0.83.0` or newer.
 
 The built-in `read` tool is always disabled. Text is read through the effective shell; images are read through `view_image`. The built-in `write` tool remains active.
 
+The extension also records the first user message's timestamp and first-turn model as fixed session metadata. It reuses that same information after later model switches and when the session is resumed.
+
 ## Install
 
 From GitHub:
@@ -86,4 +88,3 @@ npm test
 ```
 
 The current development version is `0.0.1`. The first completed release will be `0.1.0`.
-

@@ -28,6 +28,7 @@
 - [x] 实现可部分成功的批量 `edit`，保留 pi 的换行、BOM 和 Unicode/fuzzy 归一化语义。
 - [x] 实现 `view_image` 原生多模态路径与流式 vision fallback。
 - [x] 移植并收敛 `subagent`，适配扁平配置和增强工具表面。
+- [x] 移植 session info 生命周期增强，固定并持久化首条用户消息时间与首轮模型。
 - [x] 为工具注册、平台矩阵、部分 edit、vision/subagent 状态和配置合并补测试。
 - [x] 编写用户 README、配置示例和安装说明。
 - [x] 运行 typecheck、单元测试、package dry-run、真实文件 edit 与 Windows pwsh 冒烟。
