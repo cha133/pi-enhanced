@@ -1,8 +1,8 @@
-# 技术架构草案
+# 技术架构
 
 ## 交付形态
 
-建议 package 仅声明一个扩展入口：
+package 仅声明一个扩展入口：
 
 ```text
 pi-enhanced/
@@ -17,6 +17,7 @@ pi-enhanced/
 │       ├── session-info.ts
 │       └── settings.ts
 ├── tests/
+├── docs/
 ├── package.json
 └── tsconfig.json
 ```
@@ -71,7 +72,7 @@ flowchart TD
 
 ## 工具激活协调器
 
-入口不应让每个模块分别调用 `setActiveTools()`，否则注册顺序会造成互相覆盖。建议由 `activation.ts` 集中计算：
+入口不让每个模块分别调用 `setActiveTools()`，否则注册顺序会造成互相覆盖。由 `activation.ts` 集中计算：
 
 1. 读取当前 active names。
 2. 始终以增强 `edit` 接管 `edit` 名字（集合中名字不变）。

@@ -14,7 +14,7 @@
 
 ### 输入与执行
 
-建议保持 pi bash 的输入形状，仅把名字和描述改为 PowerShell：
+保持 pi bash 的输入形状，仅把名字和描述改为 PowerShell：
 
 ```ts
 {
@@ -108,7 +108,7 @@ Rejected edits:
 
 模型已经能看到同一 tool call 的完整输入，因此结果不重复完整 `oldText` / `newText`。每条 rejected 返回原索引、错误信息和有字符/行数上限的预览；预览必须含 `truncated: true`、`omittedLines` 等明确元数据，只用于定位，不能伪装成可复制重试的完整参数。details 同样不保留完整 rejected 原参数，避免无谓增加 session 体积。
 
-建议 details：
+details：
 
 ```ts
 {
@@ -137,7 +137,7 @@ Rejected edits:
 
 ### 输入
 
-建议 schema：
+schema：
 
 ```ts
 {
@@ -178,7 +178,7 @@ Rejected edits:
 ### 错误
 
 - 路径、格式或读取失败：抛出工具错误。
-- 缺少/错误 vision 配置、模型不支持图片、认证或 provider 错误：建议返回 `[Vision fallback failed: ...]` 普通文本结果，让主模型能解释或恢复。
+- 缺少/错误 vision 配置、模型不支持图片、认证或 provider 错误：返回 `[Vision fallback failed: ...]` 普通文本结果，让主模型能解释或恢复。
 - fallback 最终没有文本：同上。
 
 ## `subagent`

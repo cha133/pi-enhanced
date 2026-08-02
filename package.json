@@ -1,6 +1,6 @@
 {
   "name": "pi-enhanced",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "A minimal, practical enhancement suite for pi's native coding tools",
   "type": "module",
   "license": "MIT",

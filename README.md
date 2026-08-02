@@ -87,4 +87,4 @@ npm run typecheck
 npm test
 ```
 
-The current development version is `0.0.1`. The first completed release will be `0.1.0`.
+The current release is `0.1.0`.
