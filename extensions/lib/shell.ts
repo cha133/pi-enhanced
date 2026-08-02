@@ -1,12 +1,10 @@
 import { existsSync } from "node:fs";
-import { spawnSync } from "node:child_process";
 import { win32 } from "node:path";
 import {
 	createBashToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 
 type FileExists = (path: string) => boolean;
-type VerifyPwsh = (path: string) => boolean;
 
 export const COMMON_SHELL_GUIDELINES = [
 	"Prefer rg for search: use `rg --files` for file discovery and `rg -n PATTERN PATH` for recursive content search. Never use grep-style `rg -r` or `rg -rn`; in ripgrep, `-r` means `--replace`.",
@@ -34,23 +32,9 @@ function getEnv(environment: NodeJS.ProcessEnv, name: string): string | undefine
 	return key ? environment[key] : undefined;
 }
 
-function defaultVerifyPwsh(path: string): boolean {
-	try {
-		const result = spawnSync(
-			path,
-			["-NoLogo", "-NonInteractive", "-Command", "$PSVersionTable.PSVersion.Major"],
-			{ encoding: "utf8", timeout: 5_000, windowsHide: true },
-		);
-		return result.status === 0 && Number.parseInt(result.stdout.trim(), 10) >= 7;
-	} catch {
-		return false;
-	}
-}
-
 export function resolvePwsh7Path(
 	environment: NodeJS.ProcessEnv = process.env,
 	fileExists: FileExists = existsSync,
-	verify: VerifyPwsh = defaultVerifyPwsh,
 ): string | undefined {
 	const candidates: string[] = [];
 	const pathValue = getEnv(environment, "PATH");
@@ -70,6 +54,7 @@ export function resolvePwsh7Path(
 	addKnownPath("LOCALAPPDATA", "Microsoft", "WinGet", "Links", "pwsh.exe");
 	addKnownPath("SCOOP", "shims", "pwsh.exe");
 	addKnownPath("USERPROFILE", "scoop", "shims", "pwsh.exe");
+	addKnownPath("SCOOP_GLOBAL", "shims", "pwsh.exe");
 	addKnownPath("ProgramData", "scoop", "shims", "pwsh.exe");
 
 	const seen = new Set<string>();
@@ -78,7 +63,7 @@ export function resolvePwsh7Path(
 		const key = normalized.toLowerCase();
 		if (seen.has(key)) continue;
 		seen.add(key);
-		if (fileExists(normalized) && verify(normalized)) return normalized;
+		if (fileExists(normalized)) return normalized;
 	}
 	return undefined;
 }

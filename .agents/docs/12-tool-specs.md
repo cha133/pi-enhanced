@@ -8,7 +8,7 @@
 
 - `process.platform === "win32"`；
 - 能解析到 `pwsh.exe`；
-- 真实启动验证其 `$PSVersionTable.PSVersion.Major -ge 7`。
+- 沿用 `pi-extensions` 的路径探测：检查 `PATH` 与常见 PowerShell 7 安装位置是否存在 `pwsh.exe`，不在 pi 启动期运行它。
 
 不满足时不报错、不提示，保留用户原有的 pi `bash` 状态；入口仍用同名 override 保留原生执行并补充 bash 文件读取 guidance。
 

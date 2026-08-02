@@ -2,14 +2,13 @@ import { describe, expect, test } from "bun:test";
 import { createEnhancedShell, resolvePwsh7Path } from "../extensions/lib/shell.js";
 
 describe("PowerShell detection", () => {
-	test("deduplicates candidates and requires a verified PowerShell 7 executable", () => {
+	test("deduplicates candidates and returns the first existing pwsh executable", () => {
 		const checked: string[] = [];
 		const path = resolvePwsh7Path(
 			{ PATH: "C:\\Tools;C:\\TOOLS", ProgramFiles: "C:\\Program Files" },
-			(candidate) => candidate.toLowerCase().includes("tools\\pwsh.exe"),
 			(candidate) => {
 				checked.push(candidate);
-				return true;
+				return candidate.toLowerCase().includes("tools\\pwsh.exe");
 			},
 		);
 		expect(path?.toLowerCase()).toBe("c:\\tools\\pwsh.exe");

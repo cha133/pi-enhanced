@@ -21,7 +21,7 @@
 ## 实现待办
 
 - [x] 建立 `package.json`、`tsconfig.json`、单入口与内部源码布局。
-- [x] 编写平台探测与 PowerShell 7 版本验证。
+- [x] 编写基于路径存在性的 PowerShell 7 轻量探测，避免启动子进程。
 - [x] 实现工具激活协调器，在 session/model 生命周期中稳定应用有效工具集。
 - [x] 实现 `pwsh`，并在 fallback 环境覆盖原生 `bash` 的 prompt metadata；两者均复用 pi shell 执行、截断、取消和渲染能力。
 - [x] 合并通用 shell guidance，以及各自适用的 PowerShell / bash 文件分段读取指导。

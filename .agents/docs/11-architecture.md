@@ -41,7 +41,7 @@ flowchart TD
 
 关键约束：
 
-- 平台探测必须真实执行 `pwsh -NoProfile -NonInteractive -Command` 验证 major version ≥ 7；只发现文件不等于可运行。
+- 平台探测沿用 `pi-extensions` 的轻量策略：只在 `PATH` 与常见 PowerShell 7 安装位置查找 `pwsh.exe`，不为版本检查启动子进程。
 - 探测结果可在扩展实例内缓存，session reload 时重新构造实例即可。
 - `setActiveTools()` 以 `pi.getActiveTools()` 为基础做集合变换：删除本扩展明确接管的工具，保留未知工具。
 - 注册同名 `edit` 覆盖执行；active tools 中仍使用名字 `edit`。

@@ -53,7 +53,7 @@
 - package 仅公开 `extensions/pi-enhanced.ts`，内部实现位于 `extensions/lib/`。
 - 已实现 activation、shell、edit、view_image、settings 与 subagent。
 - 子 agent 不递归加载公开入口，而由隐藏 inline child extension 注册同平台 shell、write、enhanced edit 与 view_image；明确排除 subagent。
-- 测试覆盖激活集合、pwsh 7 探测和真实执行、fallback bash guidance、edit 分类/重叠/fuzzy/BOM/CRLF、配置合并、动态 view prompt、vision/subagent 状态归约和单入口注册。
+- 测试覆盖激活集合、pwsh 路径探测和真实工具执行、fallback bash guidance、edit 分类/重叠/fuzzy/BOM/CRLF、配置合并、动态 view prompt、vision/subagent 状态归约和单入口注册。
 - `npm run typecheck`、`npm test`、`npm pack --dry-run` 和 `npm audit --omit=dev` 已通过。
 
 ## 下一步

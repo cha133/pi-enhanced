@@ -4,7 +4,6 @@ import { join } from "node:path";
 import type { AgentToolUpdateCallback } from "@earendil-works/pi-agent-core";
 import { StringEnum, type Usage } from "@earendil-works/pi-ai";
 import type { Model } from "@earendil-works/pi-ai/compat";
-import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import {
 	createAgentSession,
@@ -23,6 +22,7 @@ import { createEnhancedEditTool } from "./edit.js";
 import { createEnhancedShell } from "./shell.js";
 import { loadModelRoute } from "./settings.js";
 import { createViewImageTool } from "./view-image.js";
+import { OneLine } from "./one-line.js";
 
 type ThinkingLevel = ReturnType<ExtensionAPI["getThinkingLevel"]>;
 export type SubagentTier = "peer" | "advisor";
@@ -437,13 +437,23 @@ export function createSubagentTool(
 		},
 		renderCall(rawInput: unknown, theme) {
 			const input = rawInput as { tier?: SubagentTier; title?: string } | undefined;
-			return new Text(theme.fg("toolTitle", theme.bold(`subagent · ${input?.tier ?? "peer"} · ${input?.title ?? ""}`)), 0, 0);
+			return new OneLine([
+				{
+					text: `subagent · ${input?.tier ?? "peer"} · ${input?.title ?? ""}`,
+					style: (text) => theme.fg("toolTitle", theme.bold(text)),
+				},
+			]);
 		},
 		renderResult(result, options, theme) {
 			const details = result.details as SubagentDetails | undefined;
 			const status = details?.status;
 			const color = status?.phase === "failed" ? "error" : status?.phase === "finished" ? "success" : "muted";
-			return new Text(theme.fg(color, status?.summary ?? (options.isPartial ? "Running..." : "Finished")), 0, 0);
+			return new OneLine([
+				{
+					text: status?.summary ?? (options.isPartial ? "Running..." : "Finished"),
+					style: (text) => theme.fg(color, text),
+				},
+			]);
 		},
 	};
 }

@@ -7,7 +7,6 @@ import {
 	type ImageContent,
 	type UserMessage,
 } from "@earendil-works/pi-ai/compat";
-import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import {
 	createReadToolDefinition,
@@ -21,6 +20,7 @@ import {
 	type ReadToolDetails,
 } from "@earendil-works/pi-coding-agent";
 import { loadModelRoute } from "./settings.js";
+import { OneLine } from "./one-line.js";
 
 const SYSTEM_PROMPTS = {
 	brief: "Answer the visual request in one or two concise sentences. Mention only directly visible evidence.",
@@ -260,18 +260,26 @@ export function createViewImageTool(
 		},
 		renderCall(rawInput: unknown, theme) {
 			const input = rawInput as { path?: string } | undefined;
-			return new Text(theme.fg("toolTitle", theme.bold(`view_image ${input?.path ?? ""}`)), 0, 0);
+			return new OneLine([
+				{
+					text: `view_image ${input?.path ?? ""}`,
+					style: (text) => theme.fg("toolTitle", theme.bold(text)),
+				},
+			]);
 		},
 		renderResult(result, options, theme) {
 			const details = result.details as ViewImageDetails | undefined;
 			if (options.isPartial && details?.visionStatus) {
-				return new Text(theme.fg("muted", details.visionStatus.summary), 0, 0);
+				return new OneLine([
+					{ text: details.visionStatus.summary, style: (text) => theme.fg("muted", text) },
+				]);
 			}
-			return new Text(
-				theme.fg("success", details?.delegated ? `Vision response · ${details.model}` : "Image attached"),
-				0,
-				0,
-			);
+			return new OneLine([
+				{
+					text: details?.delegated ? `Vision response · ${details.model}` : "Image attached",
+					style: (text) => theme.fg("success", text),
+				},
+			]);
 		},
 	};
 }
