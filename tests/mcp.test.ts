@@ -1,9 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { Tool as McpSdkTool } from "@modelcontextprotocol/client";
-import { bindMcpTools, loadMcpConfig, McpManager, type McpServerConfig } from "../extensions/lib/mcp.js";
+import {
+	bindMcpTools,
+	guardMcpOutput,
+	loadMcpConfig,
+	McpManager,
+	McpResultView,
+	type McpServerConfig,
+} from "../extensions/lib/mcp.js";
 
 const firstTool: McpSdkTool = {
 	name: "web.search",
@@ -95,6 +102,12 @@ describe("MCP manager", () => {
 						async callTool(params, options) {
 							receivedArguments = params.arguments;
 							receivedSignal = options?.signal;
+							if (params.arguments?.query === "structured") {
+								return {
+									content: [{ type: "image", data: "aW1hZ2U=", mimeType: "image/png" }],
+									structuredContent: { hits: 2 },
+								};
+							}
 							return { content: [{ type: "text", text: "found it" }], structuredContent: { hits: 1 } };
 						},
 					},
@@ -133,7 +146,20 @@ describe("MCP manager", () => {
 			expect(receivedArguments).toEqual({ query: "pi" });
 			expect(receivedSignal).toBe(signal);
 			expect(result.content).toEqual([{ type: "text", text: "found it" }]);
-			expect(result.details.structuredContent).toEqual({ hits: 1 });
+			expect(result.details).toEqual({ server: "exa", tool: "web.search" });
+
+			const structured = await registered.get("mcp_exa_web_search").execute(
+				"call-2",
+				{ query: "structured" },
+				undefined,
+				undefined,
+				{},
+			);
+			expect(structured.content).toEqual([
+				{ type: "text", text: "{\n  \"hits\": 2\n}" },
+				{ type: "image", data: "aW1hZ2U=", mimeType: "image/png" },
+			]);
+			expect(structured.details).toEqual({ server: "exa", tool: "web.search" });
 
 			const updatesBeforeNoop = activeUpdates;
 			changed?.([{ ...firstTool }]);
@@ -187,5 +213,72 @@ describe("MCP manager", () => {
 			await manager.close();
 			await rm(root, { recursive: true, force: true });
 		}
+	});
+});
+
+describe("MCP output guard", () => {
+	test("bounds a single oversized line by UTF-8 bytes and saves the full text", async () => {
+		const raw = `prefix-${"🙂".repeat(2_000)}-suffix`;
+		const guarded = await guardMcpOutput([{ type: "text", text: raw }], 1024, 20);
+		const text = guarded.content.find((part) => part.type === "text")?.text ?? "";
+		const path = guarded.truncation?.fullOutputPath;
+
+		try {
+			expect(Buffer.byteLength(text, "utf8")).toBeLessThanOrEqual(1024);
+			expect(text.startsWith("prefix-🙂")).toBe(true);
+			expect(text).toContain("[MCP output truncated:");
+			expect(guarded.truncation?.originalBytes).toBe(Buffer.byteLength(raw, "utf8"));
+			expect(path).toBeTruthy();
+			expect(await readFile(path!, "utf8")).toBe(raw);
+		} finally {
+			if (path) await rm(dirname(path), { recursive: true, force: true });
+		}
+	});
+
+	test("applies one shared budget across all text blocks while preserving images", async () => {
+		const first = "a".repeat(700);
+		const second = "b".repeat(700);
+		const guarded = await guardMcpOutput([
+			{ type: "text", text: first },
+			{ type: "image", data: "aW1hZ2U=", mimeType: "image/png" },
+			{ type: "text", text: second },
+		], 1024, 20);
+		const path = guarded.truncation?.fullOutputPath;
+
+		try {
+			expect(guarded.content.filter((part) => part.type === "text")).toHaveLength(1);
+			expect(guarded.content.filter((part) => part.type === "image")).toHaveLength(1);
+			expect(guarded.truncation?.originalBytes).toBe(1401);
+		} finally {
+			if (path) await rm(dirname(path), { recursive: true, force: true });
+		}
+	});
+
+	test("enforces the shared line limit including the truncation notice", async () => {
+		const raw = Array.from({ length: 50 }, (_, index) => `line ${index + 1}`).join("\n");
+		const guarded = await guardMcpOutput([{ type: "text", text: raw }], 10_000, 10);
+		const text = guarded.content.find((part) => part.type === "text")?.text ?? "";
+		const path = guarded.truncation?.fullOutputPath;
+
+		try {
+			expect(text.split("\n").length).toBeLessThanOrEqual(10);
+			expect(text).toContain("original 50 lines");
+			expect(guarded.truncation?.returnedLines).toBeLessThanOrEqual(10);
+		} finally {
+			if (path) await rm(dirname(path), { recursive: true, force: true });
+		}
+	});
+});
+
+describe("MCP result rendering", () => {
+	test("collapses long output to three content rows and expands on demand", () => {
+		const text = "result ".repeat(400);
+		const collapsed = new McpResultView("MCP exa/search", text, false).render(80);
+		const expanded = new McpResultView("MCP exa/search", text, true).render(80);
+
+		expect(collapsed).toHaveLength(5);
+		expect(collapsed.at(-1)).toContain("Ctrl+O to expand");
+		expect(expanded.length).toBeGreaterThan(collapsed.length);
+		expect(expanded.join("\n")).not.toContain("Ctrl+O to expand");
 	});
 });

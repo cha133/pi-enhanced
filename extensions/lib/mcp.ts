@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
 	Client,
@@ -8,7 +9,13 @@ import {
 	type Tool as McpSdkTool,
 } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import {
+	DEFAULT_MAX_BYTES,
+	DEFAULT_MAX_LINES,
+	truncateHead,
+	type ExtensionAPI,
+} from "@earendil-works/pi-coding-agent";
+import { Text, type Component } from "@earendil-works/pi-tui";
 
 export interface HttpMcpServerConfig {
 	url: string;
@@ -36,7 +43,16 @@ export interface LoadedMcpConfig {
 export interface McpToolDetails {
 	server: string;
 	tool: string;
-	structuredContent?: unknown;
+	truncation?: McpOutputTruncation;
+}
+
+export interface McpOutputTruncation {
+	originalBytes: number;
+	originalLines: number;
+	returnedBytes: number;
+	returnedLines: number;
+	fullOutputPath?: string;
+	writeError?: string;
 }
 
 type PiToolDefinition = Parameters<ExtensionAPI["registerTool"]>[0];
@@ -69,6 +85,11 @@ interface ServerState {
 	tools: Map<string, McpSdkTool>;
 	fingerprint?: string;
 }
+
+type PiContent = { type: "text"; text: string } | { type: "image"; data: string; mimeType: string };
+
+const MCP_COLLAPSED_MAX_LINES = 3;
+const MCP_COLLAPSED_MAX_CHARS = 800;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -249,16 +270,141 @@ function textForUnsupportedContent(content: CallToolResult["content"][number]): 
 	return `[Unsupported MCP content: ${content.type}]`;
 }
 
-function convertToolResult(result: CallToolResult): Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: string }> {
+function convertToolResult(result: CallToolResult): PiContent[] {
 	const content = result.content.map((part) => {
 		if (part.type === "text") return { type: "text" as const, text: part.text };
 		if (part.type === "image") return { type: "image" as const, data: part.data, mimeType: part.mimeType };
 		return { type: "text" as const, text: textForUnsupportedContent(part) };
 	});
-	if (content.length === 0 && result.structuredContent !== undefined) {
-		content.push({ type: "text", text: JSON.stringify(result.structuredContent, null, 2) });
+	const hasNativeText = result.content.some((part) => {
+		return part.type === "text" || (part.type === "resource" && "text" in part.resource);
+	});
+	if (!hasNativeText && result.structuredContent !== undefined) {
+		content.unshift({ type: "text", text: JSON.stringify(result.structuredContent, null, 2) });
 	}
 	return content.length > 0 ? content : [{ type: "text", text: "(MCP tool returned no content)" }];
+}
+
+function textStats(text: string): { bytes: number; lines: number } {
+	if (text.length === 0) return { bytes: 0, lines: 0 };
+	return {
+		bytes: Buffer.byteLength(text, "utf8"),
+		lines: text.endsWith("\n") ? text.split("\n").length - 1 : text.split("\n").length,
+	};
+}
+
+function formatBytes(bytes: number): string {
+	if (bytes < 1024) return `${bytes} B`;
+	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function truncateUtf8Head(text: string, maxBytes: number): string {
+	if (maxBytes <= 0) return "";
+	const buffer = Buffer.from(text, "utf8");
+	if (buffer.length <= maxBytes) return text;
+	let end = Math.min(maxBytes, buffer.length);
+	while (end > 0 && (buffer[end] & 0xc0) === 0x80) end -= 1;
+	return buffer.subarray(0, end).toString("utf8");
+}
+
+async function saveFullMcpOutput(text: string): Promise<{ path?: string; error?: string }> {
+	try {
+		const directory = await fs.mkdtemp(join(tmpdir(), "pi-mcp-"));
+		const path = join(directory, "output.txt");
+		await fs.writeFile(path, text, { encoding: "utf8", mode: 0o600 });
+		return { path };
+	} catch (error: unknown) {
+		return { error: error instanceof Error ? error.message : String(error) };
+	}
+}
+
+function truncationNotice(
+	stats: { bytes: number; lines: number },
+	artifact: { path?: string; error?: string },
+): string {
+	const base = `[MCP output truncated: original ${stats.lines.toLocaleString()} lines / ${formatBytes(stats.bytes)}.`;
+	if (artifact.path) return `${base} Full text: ${artifact.path}]`;
+	return `${base} Full text could not be saved: ${artifact.error ?? "unknown error"}]`;
+}
+
+export async function guardMcpOutput(
+	content: PiContent[],
+	maxBytes = DEFAULT_MAX_BYTES,
+	maxLines = DEFAULT_MAX_LINES,
+): Promise<{ content: PiContent[]; truncation?: McpOutputTruncation }> {
+	const images = content.filter((part): part is Extract<PiContent, { type: "image" }> => part.type === "image");
+	const text = content
+		.filter((part): part is Extract<PiContent, { type: "text" }> => part.type === "text")
+		.map((part) => part.text)
+		.join("\n");
+	const original = textStats(text);
+	if (original.bytes <= maxBytes && original.lines <= maxLines) return { content };
+
+	const artifact = await saveFullMcpOutput(text);
+	const notice = truncationNotice(original, artifact);
+	const separator = "\n\n";
+	const noticeStats = textStats(`${separator}${notice}`);
+	const previewBytes = Math.max(0, maxBytes - noticeStats.bytes);
+	const previewLines = Math.max(0, maxLines - noticeStats.lines);
+	const truncated = truncateHead(text, { maxBytes: previewBytes, maxLines: previewLines });
+	const preview = truncated.firstLineExceedsLimit
+		? truncateUtf8Head(text.split("\n", 1)[0], previewBytes)
+		: truncated.content;
+	const finalText = `${preview}${separator}${notice}`;
+	const returned = textStats(finalText);
+
+	return {
+		content: [{ type: "text", text: finalText }, ...images],
+		truncation: {
+			originalBytes: original.bytes,
+			originalLines: original.lines,
+			returnedBytes: returned.bytes,
+			returnedLines: returned.lines,
+			...(artifact.path ? { fullOutputPath: artifact.path } : {}),
+			...(artifact.error ? { writeError: artifact.error } : {}),
+		},
+	};
+}
+
+function resultDisplayText(content: PiContent[]): string {
+	const lines = content.flatMap((part) => part.type === "text" ? [part.text] : [`[image: ${part.mimeType}]`]);
+	return lines.length > 0 ? lines.join("\n") : "(empty result)";
+}
+
+export class McpResultView implements Component {
+	private readonly identityText: Text;
+	private readonly fullText: Text;
+
+	constructor(
+		identity: string,
+		private readonly text: string,
+		private readonly expanded: boolean,
+		private readonly identityStyle: (text: string) => string = (value) => value,
+		private readonly outputStyle: (text: string) => string = (value) => value,
+		private readonly mutedStyle: (text: string) => string = (value) => value,
+	) {
+		this.identityText = new Text(this.identityStyle(identity), 0, 0);
+		this.fullText = new Text(this.outputStyle(text), 0, 0);
+	}
+
+	render(width: number): string[] {
+		const identity = this.identityText.render(width);
+		if (this.expanded) return [...identity, ...this.fullText.render(width)];
+
+		const prefix = this.text.slice(0, MCP_COLLAPSED_MAX_CHARS);
+		const rendered = new Text(this.outputStyle(prefix), 0, 0).render(width);
+		const clipped = prefix.length < this.text.length || rendered.length > MCP_COLLAPSED_MAX_LINES;
+		return clipped
+			? [
+					...identity,
+					...rendered.slice(0, MCP_COLLAPSED_MAX_LINES),
+					this.mutedStyle("… (Ctrl+O to expand)"),
+				]
+			: [...identity, ...rendered];
+	}
+
+	invalidate(): void {}
 }
 
 export class McpManager {
@@ -386,19 +532,32 @@ export class McpManager {
 					{ name: tool.name, arguments: input as Record<string, unknown> },
 					{ signal, toolDefinition: tool },
 				);
-				const content = convertToolResult(result);
+				const guarded = await guardMcpOutput(convertToolResult(result));
 				if (result.isError) {
-					const message = content.map((part) => part.type === "text" ? part.text : `[image: ${part.mimeType}]`).join("\n");
+					const message = guarded.content.map((part) => part.type === "text" ? part.text : `[image: ${part.mimeType}]`).join("\n");
 					throw new Error(message || `MCP tool ${server}/${tool.name} failed.`);
 				}
 				return {
-					content,
+					content: guarded.content,
 					details: {
 						server,
 						tool: tool.name,
-						structuredContent: result.structuredContent,
+						...(guarded.truncation ? { truncation: guarded.truncation } : {}),
 					} satisfies McpToolDetails,
 				};
+			},
+			renderResult(result, options, theme) {
+				if (options.isPartial) return new Text(theme.fg("warning", `MCP ${server}/${tool.name}…`), 0, 0);
+				const details = result.details as McpToolDetails | undefined;
+				const identity = `MCP ${details?.server ?? server}/${details?.tool ?? tool.name}`;
+				return new McpResultView(
+					identity,
+					resultDisplayText(result.content as PiContent[]),
+					options.expanded,
+					(text) => theme.fg("muted", text),
+					(text) => theme.fg("toolOutput", text),
+					(text) => theme.fg("muted", text),
+				);
 			},
 		};
 	}

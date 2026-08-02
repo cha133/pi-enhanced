@@ -122,6 +122,8 @@ flowchart TD
 - 工具不提供 `promptSnippet` / `promptGuidelines`，信息只放在 tool name、label、description 与 parameters 中，避免重复修改 system prompt。
 - 工具删除时从 active set 移除；由于 Pi 没有 unregister API，旧 definition 可留在 registry，但不会再发送给模型。新增或变更工具从下一次模型请求起生效。
 - 调用通过同一 SDK client 路由回原 server，透传 `AbortSignal`。文本与图片原样转成 Pi content；resource 转成有来源标记的文本，audio/binary resource 返回有界的类型说明。
+- 所有 text/resource/structured-only 文本块先合并成一个预算域，再按 Pi 原生上限保留 head：50 KB 或 2,000 行，任一先到即截断。超长单行使用 UTF-8 安全的字节前缀，完整文本以 `0600` 写入系统临时目录；image blocks 不占文本预算并继续传递。
+- TUI renderer 与模型输出保护相互独立：collapsed 只渲染来源标识和最多 3 行/约 800 源字符，`Ctrl+O` 展开后显示已经过模型侧保护的完整结果。
 
 ## 兼容性原则
 

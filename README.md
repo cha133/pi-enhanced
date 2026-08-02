@@ -81,6 +81,8 @@ An entry must contain exactly one of `url` or `command`. HTTP URLs use Streamabl
 
 MCP discovery starts in the background and never delays the first user prompt. Tools that finish loading before a request are available to that request; later arrivals are added on the following model request. Tool-list change notifications refresh the direct tool surface dynamically.
 
+Model-facing MCP text is capped across all returned text blocks at 50 KB or 2,000 lines. Oversized text keeps a head preview and an explicit truncation notice; the complete text is written to a private system-temporary file. Image blocks pass through separately. In the TUI, results are independently collapsed to three output rows and roughly 800 source characters until expanded with `Ctrl+O`.
+
 This MCP client replaces the need for `pi-mcp-adapter` for the supported transports. Do not point both extensions at the same `.mcp.json`: each would open its own connection or stdio process and expose duplicate capabilities.
 
 ## Image behavior

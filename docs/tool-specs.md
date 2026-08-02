@@ -216,7 +216,16 @@ schema：
 - 父调用的 `AbortSignal` 传给 SDK `callTool()`；SDK 负责对应 transport 的取消语义。
 - MCP text/image 结果直接映射到 Pi text/image content。
 - embedded text resource 加上 URI 后作为文本返回；resource link 返回名称、描述与 URI；audio 和二进制 resource 初版只返回类型/大小说明，不把不支持的 payload 注入模型。
-- `structuredContent` 在无普通 content 时序列化为文本，同时保留在 tool details 中；MCP `isError` 转成 Pi tool error。
+- `structuredContent` 在没有原生 text/resource text 时序列化为文本；不把未受限的原始结构重复放入 details。MCP `isError` 转成 Pi tool error，错误文本同样经过输出保护。
+
+### 输出保护与显示
+
+- 所有 text blocks 合并后共享 50 KB / 2,000 行总额度，不能让每个 block 分别占满额度。
+- 采用 head 截断；超长单行保留 UTF-8 安全前缀，不返回空预览。
+- 超限时完整合并文本写入系统临时目录的 `pi-mcp-*/output.txt`，文件 mode 为 `0600`；模型结果明确给出原始字节/行数和路径。
+- image blocks 不计入文本额度并原样保留。
+- details 只保留 server、tool 和可选 truncation 统计/完整文本路径，不保留完整 structuredContent 副本。
+- TUI collapsed 状态显示 `MCP server/tool`、最多 3 行且约 800 个源字符的结果以及 `Ctrl+O` 提示；expanded 状态显示经过上述硬上限保护后的全部结果。
 
 ### 动态目录
 

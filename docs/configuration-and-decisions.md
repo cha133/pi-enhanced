@@ -108,6 +108,7 @@
 | D-027 | MCP discovery 在 session 启动时后台执行，不阻塞首条用户请求；目录完成或变化后动态刷新工具面 | 用户确认 |
 | D-028 | 父 session 持有 MCP manager/transport，subagent 共享连接与工具目录并继续禁止递归 delegation | 用户确认 |
 | D-029 | MCP 使用官方 TypeScript SDK，原始 inputSchema 交给 Pi 的 raw JSON Schema/provider 兼容路径，只在证据表明需要时增加定向转换 | 对齐结论 |
+| D-030 | MCP 模型侧文本统一限制为 50 KB / 2,000 行并把完整超限文本写入临时文件；TUI 独立折叠为 3 行/约 800 字符，展开不绕过模型侧硬上限 | 用户确认 |
 
 ## 待确认决策
 
