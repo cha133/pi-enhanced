@@ -87,8 +87,10 @@ describe("session title lifecycle", () => {
 	test("requests the first-turn model asynchronously and applies the result", async () => {
 		const h = harness();
 		let resolveRequest!: (value: any) => void;
+		let requestContext: any;
 		let requestOptions: any;
-		const request = (_model: any, _context: any, options: any) => {
+		const request = (_model: any, context: any, options: any) => {
+			requestContext = context;
 			requestOptions = options;
 			return new Promise((resolve) => {
 				resolveRequest = resolve;
@@ -101,6 +103,7 @@ describe("session title lifecycle", () => {
 		expect(result).toBeUndefined();
 		expect(h.names).toEqual([]);
 		await flushPromises();
+		expect(requestContext.systemPrompt).toContain("`配置 DeepSeek 模型`, not `配置DeepSeek模型`");
 		resolveRequest(assistant("修复登录超时"));
 		await flushPromises();
 		expect(requestOptions.maxTokens).toBeUndefined();

@@ -110,6 +110,7 @@
 | D-029 | MCP 使用官方 TypeScript SDK，原始 inputSchema 交给 Pi 的 raw JSON Schema/provider 兼容路径，只在证据表明需要时增加定向转换 | 对齐结论 |
 | D-030 | MCP 模型侧文本统一限制为 50 KB / 2,000 行并把完整超限文本写入临时文件；TUI 独立折叠为 3 行/约 800 字符，展开不绕过模型侧硬上限 | 用户确认 |
 | D-031 | 不再指导模型通过 shell 读取文件；以同名增强 `read` 覆盖原生工具，完整保留原生文本/图片行为，仅为纯文本模型增加 `image.query/detail` vision fallback；删除 `view_image`，且不引入 hashline | 用户确认 |
+| D-032 | 标题 prompt 要求中文与英文单词之间保留一个空格；暂不增加确定性后处理，依赖当前模型遵循排版要求 | 用户确认 |
 
 ## 待确认决策
 
