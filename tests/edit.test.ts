@@ -1,8 +1,16 @@
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { initTheme, ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
+import type { TUI } from "@earendil-works/pi-tui";
 import { applyPartialEdits, createEnhancedEditTool } from "../extensions/lib/edit.js";
+
+beforeAll(() => {
+	initTheme("dark");
+});
+
+const quietTui = { requestRender() {} } as TUI;
 
 describe("partial edit", () => {
 	test("applies valid entries while returning an independent not-found error", () => {
@@ -82,6 +90,62 @@ describe("partial edit", () => {
 			expect(await readFile(path, "utf8")).toBe("\uFEFFALPHA\r\nbeta\r\n");
 			expect((result.details as any).applied).toEqual([{ index: 0 }]);
 			expect((result.details as any).rejected[0].index).toBe(1);
+		} finally {
+			await rm(cwd, { recursive: true, force: true });
+		}
+	});
+
+	test("uses the native boxed call renderer and settles the applied diff into it", async () => {
+		const cwd = await mkdtemp(join(tmpdir(), "pi-enhanced-edit-render-"));
+		const path = join(cwd, "sample.txt");
+		await writeFile(path, "alpha\nbeta\n", "utf8");
+		const tool = createEnhancedEditTool(cwd);
+		const args = {
+			path: "sample.txt",
+			edits: [{ oldText: "alpha", newText: "ALPHA" }],
+		};
+		try {
+			const component = new ToolExecutionComponent("edit", "call", args, {}, tool, quietTui, cwd);
+			const result = await tool.execute("call", args, undefined, undefined, {} as any);
+			component.updateResult({ ...result, isError: false });
+
+			const rendered = component.render(80).join("\n");
+			expect(rendered).toContain("edit");
+			expect(rendered).toContain("sample.txt");
+			expect(rendered).toContain("ALPHA");
+			expect(rendered).not.toContain("Applied 1");
+		} finally {
+			await rm(cwd, { recursive: true, force: true });
+		}
+	});
+
+	test("adds compact and expanded rejection details below the native diff", async () => {
+		const cwd = await mkdtemp(join(tmpdir(), "pi-enhanced-edit-render-"));
+		const path = join(cwd, "sample.txt");
+		await writeFile(path, "alpha\nbeta\n", "utf8");
+		const tool = createEnhancedEditTool(cwd);
+		const args = {
+			path: "sample.txt",
+			edits: [
+				{ oldText: "alpha", newText: "ALPHA" },
+				{ oldText: "missing", newText: "present" },
+			],
+		};
+		try {
+			const component = new ToolExecutionComponent("edit", "call", args, {}, tool, quietTui, cwd);
+			const result = await tool.execute("call", args, undefined, undefined, {} as any);
+			component.updateResult({ ...result, isError: false });
+
+			const collapsed = component.render(80).join("\n");
+			expect(collapsed).toContain("ALPHA");
+			expect(collapsed).toContain("Applied 1; rejected 1");
+			expect(collapsed).toContain("Ctrl+O to expand");
+			expect(collapsed).not.toContain("oldText was not found");
+
+			component.setExpanded(true);
+			const expanded = component.render(80).join("\n");
+			expect(expanded).toContain("edits[1] (not_found): oldText was not found.");
+			expect(expanded).not.toContain("Ctrl+O to expand");
 		} finally {
 			await rm(cwd, { recursive: true, force: true });
 		}

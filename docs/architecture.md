@@ -66,7 +66,7 @@ flowchart TD
 ### 优先直接复用 pi
 
 - shell：`createBashTool()` 或其 definition 对应构造器，保留输出聚合、50 KB / 2,000 行截断、timeout、取消、进程树终止和 TUI。
-- edit：复用 pi 导出的队列、路径、diff 与 renderer 能力；若部分成功算法所需函数未导出，再复制带来源注释的最小纯函数。
+- edit：复用 pi 导出的队列、路径、diff 与原生 self-rendered call renderer；result renderer 先委托原生逻辑回填实际 diff，再追加部分成功的折叠/展开警告。若部分成功算法所需函数未导出，再复制带来源注释的最小纯函数。
 - image：复用 pi 原生 read/image resize 路径或可导出的 image helpers，不重新实现图片格式解析。
 - subagent：使用 pi SDK 创建内存子 session，不通过启动子 CLI 进程模拟。
 - MCP：使用官方 TypeScript SDK 的 client、stdio transport 与 Streamable HTTP transport，不自行实现协议握手、分页、取消或 session transport。

@@ -8,10 +8,8 @@ import {
 	createEditToolDefinition,
 	generateDiffString,
 	generateUnifiedPatch,
-	renderDiff,
 	withFileMutationQueue,
 	type EditToolInput,
-	type ExtensionAPI,
 } from "@earendil-works/pi-coding-agent";
 
 export type RejectionCode = "empty" | "not_found" | "duplicate" | "overlap" | "no_change";
@@ -270,9 +268,10 @@ function formatRejected(rejected: RejectedEdit[]): string {
 		.join("\n");
 }
 
-export function createEnhancedEditTool(cwd: string): Parameters<ExtensionAPI["registerTool"]>[0] {
+export function createEnhancedEditTool(cwd: string): ReturnType<typeof createEditToolDefinition> {
 	const base = createEditToolDefinition(cwd);
 	return {
+		...base,
 		name: "edit",
 		label: "edit",
 		description:
@@ -284,8 +283,6 @@ export function createEnhancedEditTool(cwd: string): Parameters<ExtensionAPI["re
 			"Do not submit overlapping or nested entries. If some entries are rejected, retry only those indexes after inspecting the returned errors and applied diff.",
 			"Keep oldText small but unique; do not pad it with large unchanged regions.",
 		],
-		parameters: base.parameters,
-		prepareArguments: base.prepareArguments,
 		async execute(_toolCallId, input: EditToolInput, signal?: AbortSignal) {
 			if (!Array.isArray(input.edits) || input.edits.length === 0) {
 				throw new Error("Edit tool input is invalid. edits must contain at least one replacement.");
@@ -328,24 +325,22 @@ export function createEnhancedEditTool(cwd: string): Parameters<ExtensionAPI["re
 				};
 			});
 		},
-		renderCall(rawArgs: unknown, theme) {
-			const args = rawArgs as { path?: unknown } | undefined;
-			const path = typeof args?.path === "string" ? args.path : "(invalid path)";
-			return new Text(theme.fg("toolTitle", theme.bold(`edit ${path}`)), 0, 0);
-		},
-		renderResult(result, _options, theme, context) {
-			const details = result.details as EnhancedEditDetails | undefined;
-			const applied = details?.applied.length ?? 0;
-			const rejected = details?.rejected.length ?? 0;
-			const color = rejected > 0 ? "warning" : "success";
-			const container = new Container();
-			container.addChild(new Text(theme.fg(color, `Applied ${applied}; rejected ${rejected}`), 0, 0));
-			if (details?.diff) {
-				const path = (context.args as { path?: string } | undefined)?.path;
-				container.addChild(new Spacer(1));
-				container.addChild(new Text(renderDiff(details.diff, { filePath: path }), 0, 0));
-			}
-			return container;
+		renderResult(result, options, theme, context) {
+			const component = base.renderResult!(result as any, options, theme, context as any) as Container;
+			if (options.isPartial || context.isError) return component;
+
+			const details = result.details as Partial<EnhancedEditDetails> | undefined;
+			const rejected = Array.isArray(details?.rejected) ? details.rejected : [];
+			if (rejected.length === 0) return component;
+
+			const applied = Array.isArray(details?.applied) ? details.applied.length : 0;
+			const summary = `Applied ${applied}; rejected ${rejected.length}`;
+			const output = options.expanded
+				? [summary, ...rejected.map((item) => `edits[${item.index}] (${item.code}): ${item.message}`)].join("\n")
+				: `${summary} · Ctrl+O to expand`;
+			component.addChild(new Spacer(1));
+			component.addChild(new Text(theme.fg("warning", output), 1, 0));
+			return component;
 		},
 	};
 }
