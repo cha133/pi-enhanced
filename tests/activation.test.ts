@@ -10,7 +10,11 @@ describe("tool activation", () => {
 				active = names;
 			},
 		} as any;
-		activateEnhancedTools(pi, "pwsh");
+		activateEnhancedTools(pi, {
+			shellName: "pwsh",
+			toolNames: ["pwsh", "read", "edit", "write"],
+			additionalToolNames: ["subagent"],
+		});
 		expect(active).toEqual(["read", "edit", "write", "third_party", "pwsh", "subagent"]);
 	});
 
@@ -22,7 +26,11 @@ describe("tool activation", () => {
 				active = names;
 			},
 		} as any;
-		activateEnhancedTools(pi, "bash");
+		activateEnhancedTools(pi, {
+			shellName: "bash",
+			toolNames: ["bash", "read", "edit", "write"],
+			additionalToolNames: ["subagent"],
+		});
 		expect(active).toContain("read");
 		expect(active).not.toContain("bash");
 		expect(active).toContain("third_party");

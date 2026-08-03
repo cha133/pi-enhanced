@@ -81,11 +81,12 @@ flowchart TD
 - vision fallback 的模型选择、stream 状态归约和 UI renderer。
 - 顶层配置合并与校验。
 - subagent 针对增强工具面的绑定逻辑。
+- 父子 session 共用的 child-safe 编码工具注册清单与激活策略；新增普通编码工具只在该共享 surface 中登记一次。
 - 两层 MCP 配置读取、严格校验、覆盖合并、工具命名以及 MCP content 到 pi tool result 的适配。
 
 ## 工具激活协调器
 
-入口不让每个模块分别调用 `setActiveTools()`，否则注册顺序会造成互相覆盖。由 `activation.ts` 集中计算：
+入口不让每个模块分别调用 `setActiveTools()`，否则注册顺序会造成互相覆盖。`tool-surface.ts` 统一注册 child-safe 编码工具，`activation.ts` 根据实际注册结果集中计算：
 
 1. 读取当前 active names。
 2. 始终以增强 `edit` 接管 `edit` 名字（集合中名字不变）。
@@ -108,13 +109,15 @@ flowchart TD
 
 ## 子 session 组装
 
-子 agent 使用 `createAgentSession()` 和内存 `SessionManager`。为避免公开入口递归注册 `subagent`，child resource loader 禁用常规扩展发现，再加载一个隐藏 inline extension：
+子 agent 使用 `createAgentSession()` 和内存 `SessionManager`。为避免公开入口递归注册 `subagent`，child resource loader 禁用常规扩展发现，再加载一个隐藏 inline extension。父 session 与该 inline extension 调用同一个 child-safe 编码工具注册器，因此新增普通增强工具不需要修改 `subagent.ts`：
 
-- 按当前平台注册 `pwsh` 或增强提示词的原生 `bash`；
-- 注册增强 `write`、增强 `edit` 与动态 `read`；
-- 始终移除 `subagent`，但保留同名覆盖后的 `read`；
+- 共享 surface 按当前平台注册 `pwsh` 或增强提示词的原生 `bash`，并注册增强 `write`、`edit` 与动态 `read`；
+- child 继承父 session 对当前 shell 的启用状态；其他 child-safe 增强工具按契约启用；
+- inline extension 的激活策略移除 `subagent`，`createAgentSession({ excludeTools: ["subagent"] })` 再做一层不可递归的结构性限制；
 - 订阅父 session 的 MCP manager，注册当前及后续发现的 MCP 直接工具；只借用连接，不拥有或关闭 transport；
 - 继承主调用选择的 peer/advisor 模型、thinking level、cwd 和 project trust。
+
+这里继承的是本 package 明确定义的 child-safe 增强工具面，不是反射复制父 registry。Pi 的 `getAllTools()` 不暴露工具执行函数，且加载任意父扩展会把无关生命周期与副作用带入 child；因此第三方普通扩展工具不会自动进入子 session。
 
 这样复用同一组工具工厂，同时从结构上阻止递归 delegation。
 

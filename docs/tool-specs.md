@@ -205,7 +205,8 @@ schema：
 ### 生命周期与输出
 
 - 直接通过 pi SDK 创建隔离的内存 session，并绑定所需扩展。
-- 子 session 工具集合必须在编码前定案；原则上与父 session 的有效增强工具面一致，但排除 `subagent`。
+- 子 session 工具集合由父子共用的 child-safe surface 定案；新增普通增强编码工具只登记一次。child 继承父 session 当前 shell 的启用状态，但不反射复制第三方扩展工具。
+- `subagent` 同时从 child 激活策略中移除，并通过 SDK `excludeTools` denylist 禁用；子 agent 即使未来调整共享注册逻辑也不能递归 delegation。
 - 将 reasoning、tool activity、reply 归约为紧凑状态，通过 `onUpdate` 展示；阶段使用小写前缀，终态显示 `finished · MODEL`。
 - 只把 final report 返回主模型；完整 JSONL transcript 存系统临时目录，路径作为内部审计元数据。
 - 传播 abort；无论成功、失败或取消，都 unsubscribe、导出 transcript、abort、发 shutdown、dispose。

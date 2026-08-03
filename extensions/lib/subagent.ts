@@ -18,13 +18,11 @@ import {
 	type ExtensionAPI,
 	type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import { createEnhancedEditTool } from "./edit.js";
+import { activateEnhancedTools } from "./activation.js";
 import { bindMcpTools, type McpManager } from "./mcp.js";
-import { createEnhancedReadTool } from "./read.js";
-import { createEnhancedShell } from "./shell.js";
 import { loadModelRoute } from "./settings.js";
 import { OneLine } from "./one-line.js";
-import { createEnhancedWriteTool } from "./write.js";
+import { registerEnhancedCodingSurface } from "./tool-surface.js";
 
 type ThinkingLevel = ReturnType<ExtensionAPI["getThinkingLevel"]>;
 export type SubagentTier = "peer" | "advisor";
@@ -205,39 +203,40 @@ function messageText(event: SessionEvent): string {
 		.trim();
 }
 
+export function createSubagentChildExtension(
+	mcpManager: McpManager | undefined,
+	parentActiveToolNames: readonly string[] | undefined,
+): (pi: ExtensionAPI) => void {
+	return (pi: ExtensionAPI) => {
+		let unbindMcp: (() => void) | undefined;
+		pi.on("session_start", (_event, ctx) => {
+			const surface = registerEnhancedCodingSurface(pi, ctx);
+			const excludedToolNames = new Set(["subagent"]);
+			if (parentActiveToolNames && !parentActiveToolNames.includes(surface.shell.name)) {
+				excludedToolNames.add(surface.shell.name);
+			}
+			activateEnhancedTools(pi, {
+				shellName: surface.shell.name,
+				toolNames: surface.toolNames,
+				excludedToolNames,
+			});
+			if (mcpManager) unbindMcp = bindMcpTools(pi, mcpManager);
+		});
+		pi.on("session_shutdown", () => unbindMcp?.());
+	};
+}
+
 async function createChildSession(
 	cwd: string,
 	model: Model<any>,
 	thinkingLevel: ThinkingLevel,
 	projectTrusted: boolean,
 	mcpManager: McpManager | undefined,
+	parentActiveToolNames: readonly string[] | undefined,
 ): Promise<AgentSession> {
 	const agentDir = getAgentDir();
 	const settingsManager = SettingsManager.create(cwd, agentDir, { projectTrusted });
-	const shell = createEnhancedShell(cwd);
-	const childExtension = (pi: ExtensionAPI) => {
-		let unbindMcp: (() => void) | undefined;
-		pi.on("session_start", (_event, ctx) => {
-			pi.registerTool(shell.tool);
-			pi.registerTool(createEnhancedEditTool(ctx.cwd));
-			pi.registerTool(createEnhancedReadTool(ctx.cwd, ctx));
-			pi.registerTool(createEnhancedWriteTool(ctx.cwd));
-			const active = new Set(pi.getActiveTools());
-			active.delete("subagent");
-			if (shell.name === "pwsh") {
-				active.delete("bash");
-				active.add("pwsh");
-			} else {
-				active.delete("pwsh");
-			}
-			active.add("write");
-			active.add("edit");
-			active.add("read");
-			pi.setActiveTools([...active]);
-			if (mcpManager) unbindMcp = bindMcpTools(pi, mcpManager);
-		});
-		pi.on("session_shutdown", () => unbindMcp?.());
-	};
+	const childExtension = createSubagentChildExtension(mcpManager, parentActiveToolNames);
 	const resourceLoader = new DefaultResourceLoader({
 		cwd,
 		agentDir,
@@ -251,6 +250,7 @@ async function createChildSession(
 		cwd,
 		model,
 		thinkingLevel,
+		excludeTools: ["subagent"],
 		settingsManager,
 		resourceLoader,
 		sessionManager: SessionManager.inMemory(cwd),
@@ -274,11 +274,12 @@ async function runSubagent(
 	thinkingLevel: ThinkingLevel,
 	projectTrusted: boolean,
 	mcpManager: McpManager | undefined,
+	parentActiveToolNames: readonly string[] | undefined,
 	task: string,
 	signal: AbortSignal | undefined,
 	onStatus: ((status: SubagentStatus) => void) | undefined,
 ): Promise<RunResult> {
-	const session = await createChildSession(cwd, model, thinkingLevel, projectTrusted, mcpManager);
+	const session = await createChildSession(cwd, model, thinkingLevel, projectTrusted, mcpManager, parentActiveToolNames);
 	const usage = emptyUsage();
 	const tracker = new SubagentProgressTracker();
 	let output = "";
@@ -377,6 +378,7 @@ export function createSubagentTool(
 	available: boolean,
 	getThinkingLevel: () => ThinkingLevel,
 	getMcpManager: () => McpManager | undefined = () => undefined,
+	getParentActiveToolNames: () => readonly string[] | undefined = () => undefined,
 ): Parameters<ExtensionAPI["registerTool"]>[0] {
 	return {
 		name: "subagent",
@@ -422,6 +424,7 @@ export function createSubagentTool(
 				getThinkingLevel(),
 				ctx.isProjectTrusted(),
 				getMcpManager(),
+				getParentActiveToolNames(),
 				input.task,
 				signal,
 				onUpdate ? (status) => onUpdate({ content: [], details: makeDetails(status) }) : undefined,
