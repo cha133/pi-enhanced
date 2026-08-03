@@ -10,7 +10,7 @@
 - 能解析到 `pwsh.exe`；
 - 沿用 `pi-extensions` 的路径探测：检查 `PATH` 与常见 PowerShell 7 安装位置是否存在 `pwsh.exe`，不在 pi 启动期运行它。
 
-不满足时不报错、不提示，保留用户原有的 pi `bash` 状态；入口仍用同名 override 保留原生执行并补充 bash 文件读取 guidance。
+不满足时不报错、不提示，保留用户原有的 pi `bash` 状态；入口仍用同名 override 保留原生执行并补充通用 shell/ripgrep guidance。
 
 ### 输入与执行
 
@@ -38,20 +38,13 @@
 - 不使用 `Invoke-Expression` 拼装整条命令。
 - PowerShell pipeline 传对象；限制输出用 `Select-Object -First N` / `-Last N`。
 - 文件发现优先 `rg --files`，内容搜索优先 `rg -n`；禁止误用 `rg -r`。
-- 文本文件完整读取使用 `Get-Content -LiteralPath 'path'`；需要原始单字符串时用 `-Raw`。
-- 分段读取建议：`Get-Content -LiteralPath 'path' | Select-Object -Skip <zero-based> -First <count>`。
-- 读取指定行区间时明确 `-Skip` 为零基跳过数量，而用户/编辑器行号通常从 1 开始。
 - 非平凡分支、循环、结构化处理转为 `$env:TEMP` 下的临时 TypeScript，并用 Bun 执行。
-- 不为简单读取生成脚本；`Get-Content` / `rg` 足够时保持直接。
 
 ### fallback `bash` guidance
 
 非 Windows 或 Windows 无 pwsh 7 时，工具名仍为 `bash`，执行行为完全沿用 pi；override 只显式保留原 prompt metadata 并加入：
 
 - 文件发现与内容搜索仍优先 `rg --files` / `rg -n`。
-- 小文件可用 `cat -- path`；不得无界输出未知大小文件。
-- 分段读取用 `sed -n '<start>,<end>p' -- path`，其中行号从 1 开始且区间包含两端。
-- 从某行开始读取固定数量可用 `tail -n +<start> -- path | head -n <count>`。
 - 限制搜索或命令输出优先使用命令自身的 limit 参数，再考虑 `head` / `tail`。
 - 复杂逻辑转到系统临时目录中的 TypeScript/Bun 脚本；临时目录使用跨平台可解析方式，不在仓库遗留脚本。
 
@@ -133,7 +126,7 @@ details：
 - 部分成功使用成功/警告语义，不显示成全红失败。
 - rejected 摘要在折叠视图保持紧凑，expanded 可展示逐项原因。
 
-## `view_image`
+## `read`
 
 ### 输入
 
@@ -142,14 +135,19 @@ schema：
 ```ts
 {
   path: string;
-  query?: string;
-  detail?: "brief" | "standard" | "detailed";
+  offset?: number;
+  limit?: number;
+  image?: {
+    query?: string;
+    detail?: "brief" | "standard" | "detailed";
+  };
 }
 ```
 
-- `path` 支持 cwd 相对路径和绝对路径。
-- `query` 缺省为准确描述图片；用户有具体问题时模型应原样传达重点。
-- `detail` 控制 fallback system prompt 的深度，也可作为给原生模型的文字提示。
+- `path`、`offset`、`limit` 完全沿用 pi 0.83.0 原生 `read` schema 与语义。
+- `image.query` 缺省为准确描述图片；用户有具体问题时模型应原样传达重点。
+- `image.detail` 控制 fallback system prompt 的深度，也可作为给原生模型的文字提示。
+- 文本结果保持原生内容、分页提示、50 KB / 2,000 行截断、错误和 renderer；不增加 hashline 标签、行锚点或 session grounding。
 
 ### 原生多模态路径
 
@@ -158,7 +156,7 @@ schema：
 - 复用 pi 的本地图片读取、MIME 判断和自动等比缩放，不裁切。默认遵循 pi 设置：最大 2000×2000，并将 base64 payload 控制在约 4.5 MB 内。
 - 返回 image content（以及必要的 query text），让当前模型在下一轮原生消费。
 - 不发起第二次模型调用。
-- 工具 description/guidelines 明确说明图片由当前模型亲自查看。
+- 工具 description/guidelines 明确说明图片由当前模型亲自查看；调用与结果继续使用原生 `read` renderer。
 
 ### 纯文本 fallback 路径
 
@@ -168,16 +166,16 @@ schema：
 2. 验证 fallback 模型声明 image input，并获取认证信息；发送与原生路径相同的预处理图片。
 3. 调用 `stream()`，消息包含 query 与 image content。
 4. 把 `start`、`thinking_delta`、`text_delta` 归约成用户可见的单行状态，经 `onUpdate` 约 100 ms 限流发布；流式阶段使用 `reasoning: `、`replying: ` 等小写前缀，终态使用 `finished · MODEL`。
-5. 最终只把 vision 模型文本回复返回给主模型，并按 pi 上限截断。
+5. 最终只把 vision 模型文本回复返回给主模型，并按 pi 上限截断；文本文件读取绝不触发 vision fallback。
 6. 返回嵌套模型 usage；传播 abort。
 
-工具 description/guidelines 明确说明当前模型不能直接看图，`view_image` 会调用外挂 vision 模型，返回值是该模型的视觉描述而非当前模型的直接观察。
+工具 description/guidelines 明确说明当前模型不能直接看图，`read` 会调用外挂 vision 模型，返回值是该模型的视觉描述而非当前模型的直接观察。
 
 “实时看到回复”指沿用 `pi-extensions` read vision 与 subagent 的显示方式：TUI 中持续更新一行最新 thinking/reply 摘要，不把完整中间 token stream 永久写入父 transcript。
 
 ### 错误
 
-- 路径、格式或读取失败：抛出工具错误。
+- 路径、格式或读取失败：沿用原生 `read` 行为；无法处理成 image content 时不错误触发 fallback。
 - 缺少/错误 vision 配置、模型不支持图片、认证或 provider 错误：返回 `[Vision fallback failed: ...]` 普通文本结果，让主模型能解释或恢复。
 - fallback 最终没有文本：同上。
 

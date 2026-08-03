@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { formatSubagentStatus, SubagentProgressTracker } from "../extensions/lib/subagent.js";
-import { formatVisionStatus, VisionProgressTracker } from "../extensions/lib/view-image.js";
+import { formatVisionStatus, VisionProgressTracker } from "../extensions/lib/read.js";
 import { OneLine } from "../extensions/lib/one-line.js";
 
 describe("nested model progress", () => {

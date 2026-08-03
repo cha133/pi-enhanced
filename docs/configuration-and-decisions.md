@@ -26,7 +26,7 @@
 
 ### `vision`
 
-- 可选；仅文本模型调用 `view_image` 时要求存在。
+- 可选；仅文本模型通过 `read` 读取图片时要求存在。
 - 必须含非空字符串 `provider` 与 `model`。
 - 指向的模型必须已在 pi model registry 中存在且声明 image input。
 
@@ -83,19 +83,19 @@
 | D-002 | 交付只暴露一个扩展入口 | 用户需求 |
 | D-003 | Windows 且有 PowerShell 7 时提供 `pwsh` 并禁用 `bash`；否则使用原生 `bash` | 用户需求 |
 | D-004 | 覆盖 `edit`，并允许批量 replacements 部分成功 | 用户需求 |
-| D-005 | 单独提供 `view_image`，兼容多模态与 vision fallback | 用户需求 |
+| D-005 | 单独提供 `view_image`，兼容多模态与 vision fallback（已由 D-031 取代） | 用户需求 |
 | D-006 | vision fallback 期间用户可看到模型实时进展 | 用户需求 |
 | D-007 | 提供 `subagent`，advisor 与 vision 采用同层配置 | 用户需求 |
 | D-008 | 单入口允许导入内部模块，package manifest 只暴露一个扩展入口 | 用户确认 |
-| D-009 | 所有平台禁用 `read`；fallback 环境静默保留并增强原生 `bash` 的 prompt metadata | 用户确认 |
-| D-010 | `view_image` 使用 path/query/detail；多模态原生消费，纯文本走明确标识的外挂 vision，prompt metadata 随模型能力变化 | 用户确认 |
+| D-009 | 所有平台禁用 `read`；fallback 环境静默保留并增强原生 `bash` 的 prompt metadata（已由 D-031 取代） | 用户确认 |
+| D-010 | `view_image` 使用 path/query/detail；多模态原生消费，纯文本走明确标识的外挂 vision，prompt metadata 随模型能力变化（已由 D-031 取代） | 用户确认 |
 | D-011 | vision fallback 失败返回普通结果，不抛工具错误 | 用户确认 |
 | D-012 | subagent 保留 peer/advisor tier，advisor 配置扁平化，子 agent 继承平台有效工具集 | 用户确认 |
 | D-013 | 包名 `pi-enhanced`、MIT、GitHub 直接安装；首个完成版本为 0.1.0；最低 pi 0.83.0 | 用户确认 |
 | D-014 | edit 重叠组全部拒绝，其他正确项合并成一次原子写盘 | 用户确认 |
 | D-015 | edit rejected 仅回传索引、错误信息和明确标注为不完整的有界预览 | 用户确认 |
 | D-016 | vision fallback 使用与 read vision/subagent 一致的紧凑单行实时状态 | 用户确认 |
-| D-017 | `view_image.detail` 只控制分析深度；图片沿用 pi 自动等比缩放，不提供原始分辨率开关 | 用户确认 |
+| D-017 | 图片 detail 只控制分析深度；图片沿用 pi 自动等比缩放，不提供原始分辨率开关 | 用户确认 |
 | D-018 | pwsh 7 加载用户 profile 并注入 `TERM=dumb` | 用户确认 |
 | D-019 | edit 的参数级错误局部拒绝；即使全部 rejected 也返回普通结果，只有 I/O、取消或内部错误抛 tool error | 对齐结论 |
 | D-020 | 移植 `pi-extensions` session info，在首轮固定时间与模型并跨模型切换、session resume 复用 | 用户需求 |
@@ -109,6 +109,7 @@
 | D-028 | 父 session 持有 MCP manager/transport，subagent 共享连接与工具目录并继续禁止递归 delegation | 用户确认 |
 | D-029 | MCP 使用官方 TypeScript SDK，原始 inputSchema 交给 Pi 的 raw JSON Schema/provider 兼容路径，只在证据表明需要时增加定向转换 | 对齐结论 |
 | D-030 | MCP 模型侧文本统一限制为 50 KB / 2,000 行并把完整超限文本写入临时文件；TUI 独立折叠为 3 行/约 800 字符，展开不绕过模型侧硬上限 | 用户确认 |
+| D-031 | 不再指导模型通过 shell 读取文件；以同名增强 `read` 覆盖原生工具，完整保留原生文本/图片行为，仅为纯文本模型增加 `image.query/detail` vision fallback；删除 `view_image`，且不引入 hashline | 用户确认 |
 
 ## 待确认决策
 

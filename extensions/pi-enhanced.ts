@@ -1,12 +1,12 @@
 import { getAgentDir, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { activateEnhancedTools } from "./lib/activation.js";
 import { createEnhancedEditTool } from "./lib/edit.js";
+import { createEnhancedReadTool } from "./lib/read.js";
 import { bindMcpTools, McpManager } from "./lib/mcp.js";
 import { createEnhancedShell, type ShellRegistration } from "./lib/shell.js";
 import { registerSessionInfo } from "./lib/session-info.js";
 import { registerSessionTitle } from "./lib/session-title.js";
 import { createSubagentTool, isAdvisorAvailable } from "./lib/subagent.js";
-import { createViewImageTool } from "./lib/view-image.js";
 
 export default function piEnhanced(pi: ExtensionAPI): void {
 	registerSessionInfo(pi);
@@ -18,7 +18,7 @@ export default function piEnhanced(pi: ExtensionAPI): void {
 	let unbindMcp: (() => void) | undefined;
 
 	const registerModelAwareTools = (ctx: ExtensionContext) => {
-		pi.registerTool(createViewImageTool(ctx.cwd, ctx));
+		pi.registerTool(createEnhancedReadTool(ctx.cwd, ctx));
 		pi.registerTool(createSubagentTool(isAdvisorAvailable(ctx), () => pi.getThinkingLevel(), () => mcpManager));
 	};
 

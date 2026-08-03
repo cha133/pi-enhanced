@@ -6,7 +6,7 @@
 
 ## 已完成验收
 
-- [x] 在已认证的多模态主模型上验收 `view_image` 原生图片返回。
+- [x] 在已认证的多模态主模型上验收原图片读取路径（现已合并为增强 `read`）。
 - [x] 在纯文本主模型与已配置 vision 模型上验收 fallback、usage 与取消。
 - [x] 在 peer/advisor tier 上验收真实 subagent 的子工具集、transcript 与取消清理。
 - [x] 在已认证的真实当前模型上验收首条消息异步命名、手工改名竞争与 fork 尾缀。

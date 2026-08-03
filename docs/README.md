@@ -4,7 +4,7 @@
 
 - [产品范围](./product-scope.md)：定位、边界、工具表面与成功标准。
 - [技术架构](./architecture.md)：入口、生命周期、平台分支和共享基础设施。
-- [工具行为契约](./tool-specs.md)：`pwsh`、`edit`、`view_image` 与 `subagent` 的稳定语义。
+- [工具行为契约](./tool-specs.md)：`pwsh`、`read`、`edit` 与 `subagent` 的稳定语义。
 - [配置与决策](./configuration-and-decisions.md)：配置格式及已确认的关键取舍。
 - [验证状态](./verification.md)：发布前人工验收状态与延期项。
 

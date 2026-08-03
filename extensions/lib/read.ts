@@ -32,10 +32,14 @@ const SYSTEM_PROMPTS = {
 
 type ImageDetail = keyof typeof SYSTEM_PROMPTS;
 
-export interface ViewImageInput {
+export interface EnhancedReadInput {
 	path: string;
-	query?: string;
-	detail?: ImageDetail;
+	offset?: number;
+	limit?: number;
+	image?: {
+		query?: string;
+		detail?: ImageDetail;
+	};
 }
 
 export type VisionPhase = "sending" | "thinking" | "reasoning" | "replying" | "finished" | "failed" | "cancelled";
@@ -45,7 +49,7 @@ export interface VisionStatus {
 	summary: string;
 }
 
-export interface ViewImageDetails extends ReadToolDetails {
+export interface EnhancedReadDetails extends ReadToolDetails {
 	visionStatus?: VisionStatus;
 	delegated?: boolean;
 	provider?: string;
@@ -106,7 +110,7 @@ function failure(message: string) {
 	const phase: VisionPhase = message === "cancelled" ? "cancelled" : "failed";
 	return {
 		content: [{ type: "text" as const, text: `[Vision fallback failed: ${message}]` }],
-		details: { visionStatus: { phase, summary: message } } satisfies ViewImageDetails,
+		details: { visionStatus: { phase, summary: message }, delegated: true } satisfies EnhancedReadDetails,
 	};
 }
 
@@ -114,16 +118,23 @@ function findImage(content: Array<{ type: string }>): ImageContent | undefined {
 	return content.find((part): part is ImageContent => part.type === "image");
 }
 
-function queryFor(input: ViewImageInput): string {
-	return input.query?.trim() || "Describe this image accurately.";
+export function needsVisionFallback(
+	content: Array<{ type: string }>,
+	model: ModelWithInputs | undefined,
+): boolean {
+	return !supportsImages(model) && findImage(content) !== undefined;
+}
+
+function queryFor(input: EnhancedReadInput): string {
+	return input.image?.query?.trim() || "Describe this image accurately.";
 }
 
 async function delegateVision(
 	image: ImageContent,
-	input: ViewImageInput,
+	input: EnhancedReadInput,
 	signal: AbortSignal | undefined,
 	ctx: ExtensionContext,
-	onUpdate: AgentToolUpdateCallback<ViewImageDetails | undefined> | undefined,
+	onUpdate: AgentToolUpdateCallback<EnhancedReadDetails | undefined> | undefined,
 ) {
 	let route;
 	try {
@@ -147,7 +158,7 @@ async function delegateVision(
 	let pending: VisionStatus | undefined;
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	let lastUpdate = 0;
-	const detailsFor = (visionStatus: VisionStatus): ViewImageDetails => ({
+	const detailsFor = (visionStatus: VisionStatus): EnhancedReadDetails => ({
 		visionStatus,
 		delegated: true,
 		provider: model.provider,
@@ -179,7 +190,7 @@ async function delegateVision(
 	try {
 		const responseStream = stream(
 			model,
-			{ systemPrompt: SYSTEM_PROMPTS[input.detail ?? "standard"], messages: [message] },
+			{ systemPrompt: SYSTEM_PROMPTS[input.image?.detail ?? "standard"], messages: [message] },
 			{ apiKey: auth.apiKey, headers: auth.headers, env: auth.env, signal },
 		);
 		let response: AssistantMessage | undefined;
@@ -213,7 +224,7 @@ async function delegateVision(
 				provider: model.provider,
 				model: model.id,
 				truncation: truncation.truncated ? truncation : undefined,
-			} satisfies ViewImageDetails,
+			} satisfies EnhancedReadDetails,
 			usage: response.usage,
 		};
 	} catch (error: unknown) {
@@ -221,7 +232,7 @@ async function delegateVision(
 	}
 }
 
-export function createViewImageTool(
+export function createEnhancedReadTool(
 	cwd: string,
 	ctx: ExtensionContext,
 ): Parameters<ExtensionAPI["registerTool"]>[0] {
@@ -229,59 +240,57 @@ export function createViewImageTool(
 	const manager = SettingsManager.create(cwd, getAgentDir(), { projectTrusted: ctx.isProjectTrusted() });
 	const nativeRead = createReadToolDefinition(cwd, { autoResizeImages: manager.getImageAutoResize() });
 	const parameters = Type.Object({
-		path: Type.String({ description: "Path to a local image, relative to the working directory or absolute" }),
-		query: Type.Optional(Type.String({ description: "Question or instruction about the image" })),
-		detail: Type.Optional(
-			StringEnum(["brief", "standard", "detailed"] as const, {
-				description: "Requested analysis depth; defaults to standard",
-			}),
-		),
+		...nativeRead.parameters.properties,
+		image: Type.Optional(Type.Object({
+			query: Type.Optional(Type.String({ description: "Question or instruction about an image" })),
+			detail: Type.Optional(
+				StringEnum(["brief", "standard", "detailed"] as const, {
+					description: "Requested visual analysis depth; defaults to standard",
+				}),
+			),
+		})),
 	});
 	return {
-		name: "view_image",
-		label: "view_image",
+		...nativeRead,
+		name: "read",
+		label: "read",
 		description: nativeMode
-			? "Load a local image for you to inspect directly with your native image understanding. Images are automatically resized using pi's image settings; detail changes analysis depth, not resolution."
-			: "Inspect a local image through the configured external vision model. You cannot see the image directly: this tool returns that model's visual description. Images are automatically resized using pi's image settings.",
+			? nativeRead.description.replace("Images are sent as attachments.", "Images are sent as attachments for direct inspection.")
+			: nativeRead.description.replace("Images are sent as attachments.", "Images are inspected by the configured external vision model and returned as text."),
 		promptSnippet: nativeMode
-			? "Load a local image for direct visual inspection"
-			: "Ask the configured external vision model to inspect a local image",
+			? "Read file contents and inspect images directly"
+			: "Read file contents with automatic vision fallback",
 		promptGuidelines: nativeMode
 			? [
-					"Use view_image for local images. The returned image is attached for you to inspect directly.",
-					"Pass the user's visual question in query; detail controls response depth and does not request original resolution.",
+					...(nativeRead.promptGuidelines ?? []),
+					"Use read for both text files and local images; images are attached for you to inspect directly.",
+					"Pass a visual question in image.query; image.detail controls response depth, not resolution.",
 				]
 			: [
-					"Use view_image for local images. You do not see the image directly; the returned text is an external vision model's description and should be treated as delegated evidence.",
-					"Pass a precise question in query so the external vision model focuses on what the task needs.",
+					...(nativeRead.promptGuidelines ?? []),
+					"Use read for both text files and local images; image reads return the configured external vision model's description as delegated evidence.",
+					"Pass a precise visual question in image.query and use image.detail when response depth matters.",
 				],
 		parameters,
-		async execute(toolCallId, input: ViewImageInput, signal, onUpdate, toolCtx) {
-			const result = await nativeRead.execute(toolCallId, { path: input.path }, signal, undefined, toolCtx);
-			const image = findImage(result.content);
-			if (!image) {
-				throw new Error(`Path is not a supported image or image processing failed: ${input.path}`);
-			}
-			if (supportsImages(toolCtx.model)) return result;
+		async execute(toolCallId, input: EnhancedReadInput, signal, onUpdate, toolCtx) {
+			const { image: _image, ...nativeInput } = input;
+			const result = await nativeRead.execute(toolCallId, nativeInput, signal, onUpdate, toolCtx);
+			if (!needsVisionFallback(result.content, toolCtx.model)) return result;
+			const image = findImage(result.content)!;
 			return delegateVision(image, input, signal, toolCtx, onUpdate);
 		},
-		renderCall(rawInput: unknown, theme) {
-			const input = rawInput as { path?: string } | undefined;
-			return new OneLine([
-				{
-					text: `view_image ${input?.path ?? ""}`,
-					style: (text) => theme.fg("toolTitle", theme.bold(text)),
-				},
-			]);
+		renderCall(rawInput: unknown, theme, context) {
+			return nativeRead.renderCall!(rawInput as any, theme, context as any);
 		},
-		renderResult(result, options, theme) {
-			const details = result.details as ViewImageDetails | undefined;
+		renderResult(result, options, theme, context) {
+			const details = result.details as EnhancedReadDetails | undefined;
 			if (options.isPartial && details?.visionStatus) {
 				return new OneLine([
 					{ text: formatVisionStatus(details.visionStatus), style: (text) => theme.fg("muted", text) },
 				]);
 			}
-			const status: VisionStatus = details?.visionStatus ?? { phase: "finished", summary: "Image attached" };
+			if (!details?.delegated) return nativeRead.renderResult!(result as any, options, theme, context as any);
+			const status: VisionStatus = details.visionStatus ?? { phase: "finished", summary: "vision model" };
 			const color = status.phase === "failed" ? "error" : status.phase === "cancelled" ? "warning" : "success";
 			return new OneLine([
 				{

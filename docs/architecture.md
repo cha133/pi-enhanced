@@ -12,7 +12,7 @@ pi-enhanced/
 │       ├── activation.ts
 │       ├── pwsh.ts
 │       ├── edit.ts
-│       ├── view-image.ts
+│       ├── read.ts
 │       ├── subagent.ts
 │       ├── session-info.ts
 │       ├── session-title.ts
@@ -32,14 +32,14 @@ flowchart TD
     A["扩展 factory"] --> B["注册生命周期处理器"]
     B --> C["session_start"]
     C --> D["探测 win32 与 pwsh 7"]
-    D --> E["注册/刷新 edit、view_image、subagent"]
+    D --> E["注册/刷新 read、edit、subagent"]
     D --> F{"pwsh 可用?"}
     F -->|是| G["注册 pwsh"]
     F -->|否| H["同名覆盖 bash prompt metadata，保留原生执行"]
     G --> I["基于当前 active tools 做最小增删"]
     H --> I
     I --> J["应用有效工具集"]
-    K["model_select"] --> L["刷新 view_image/subagent 的动态 schema 或能力"]
+    K["model_select"] --> L["刷新 read/subagent 的动态 prompt metadata 或能力"]
     B --> M["session info: session_start 恢复；before_agent_start 首次捕获并注入"]
     B --> N["session title: 首条消息异步请求当前模型；完成后持久化名称"]
     B --> O["MCP manager: 后台读取配置并并行连接 server"]
@@ -54,8 +54,8 @@ flowchart TD
 - `setActiveTools()` 以 `pi.getActiveTools()` 为基础做集合变换：删除本扩展明确接管的工具，保留未知工具。
 - 注册同名 `edit` 覆盖执行；active tools 中仍使用名字 `edit`。
 - `pwsh` 使用新名字，因此必须先注册，再把 `pwsh` 加入 active tools 并移除 `bash`。
-- `view_image`、`subagent` 先注册后激活；避免传入未知工具名被 pi 忽略。
-- `view_image` 在 `session_start` / `model_select` 按当前模型的 image input 能力重新注册 prompt metadata：多模态路径描述为当前模型亲自查看图片，纯文本路径明确说明会委托外挂 vision 模型并返回其描述。
+- `read`、`subagent` 先注册后激活；`read` 以同名 definition 覆盖原生工具，但复用原生 execute/render 能力。
+- `read` 在 `session_start` / `model_select` 按当前模型的 image input 能力重新注册 prompt metadata：多模态路径描述为当前模型亲自查看图片，纯文本路径明确说明会委托外挂 vision 模型并返回其描述。
 - session info 在第一轮 `before_agent_start` 才同时捕获时间与当前模型，并写入 `session-info` custom entry；后续轮次、模型切换和 session resume 始终复用固定 prompt。
 - session title 只处理没有历史用户消息、没有现有名称的新会话。第一轮 `before_agent_start` 立即启动不阻塞主回答的当前模型请求。请求不设置模型输出 token 上限；标题长度由 prompt 和返回后的 60 字符清洗共同约束。完成后通过 `setSessionName()` 持久化，请求失败或纯图片首条消息静默保留 pi 默认名称。
 - fork 不调用标题模型：若继承到名称，则把末尾 ` (n)` 递增，或首次追加 ` (1)`；未命名 fork 保留 pi 默认名称。
@@ -86,9 +86,9 @@ flowchart TD
 
 1. 读取当前 active names。
 2. 始终以增强 `edit` 接管 `edit` 名字（集合中名字不变）。
-3. 始终移除 `read`。
-4. 若 pwsh 可用，移除 `bash`、加入 `pwsh`；否则同名注册带增强 guidance 的 `bash` override、移除可能残留的 `pwsh` 并保留原先 `bash` 状态。
-5. 加入 `view_image` 与 `subagent`。
+3. 始终加入同名覆盖后的 `read`。
+4. 若 pwsh 可用，移除 `bash`、加入 `pwsh`；否则同名注册仅带通用 shell/ripgrep guidance 的 `bash` override、移除可能残留的 `pwsh` 并保留原先 `bash` 状态。
+5. 加入 `subagent`。
 6. 去重后一次调用 `setActiveTools()`。
 
 注意：“保留原先 `bash` 状态”意味着如果用户本来手动禁用了 bash，扩展不应擅自启用它。
@@ -107,8 +107,8 @@ flowchart TD
 子 agent 使用 `createAgentSession()` 和内存 `SessionManager`。为避免公开入口递归注册 `subagent`，child resource loader 禁用常规扩展发现，再加载一个隐藏 inline extension：
 
 - 按当前平台注册 `pwsh` 或增强提示词的原生 `bash`；
-- 启用原生 `write`，注册增强 `edit` 与动态 `view_image`；
-- 始终移除 `read` 与 `subagent`；
+- 启用原生 `write`，注册增强 `edit` 与动态 `read`；
+- 始终移除 `subagent`，但保留同名覆盖后的 `read`；
 - 订阅父 session 的 MCP manager，注册当前及后续发现的 MCP 直接工具；只借用连接，不拥有或关闭 transport；
 - 继承主调用选择的 peer/advisor 模型、thinking level、cwd 和 project trust。
 

@@ -16,7 +16,7 @@ Read `docs/README.md` first, then open only the design document relevant to the 
 ## Working rules
 
 - Preserve the single-entry package surface declared in `package.json`.
-- Keep `read` disabled. Text reads belong to the effective shell; image reads belong to `view_image`.
+- Keep `read` active as a same-name override of pi's native reader, adding only automatic vision fallback for text-only models. Do not add hashline behavior or a separate `view_image` tool.
 - Compute active tools from the existing active set and preserve tools registered by other extensions.
 - On Windows, expose `pwsh` only when PowerShell 7 is found; otherwise preserve the enhanced native `bash` path.
 - Preserve `edit` partial-success semantics: classify replacements against one snapshot, reject every member of an overlap group, and commit accepted edits in one write.

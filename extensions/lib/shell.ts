@@ -11,18 +11,10 @@ export const COMMON_SHELL_GUIDELINES = [
 	"Keep simple commands and pipelines in the shell. For branching, loops, structured-data processing, or fragile quoting, write a temporary TypeScript script outside the repository and run it with Bun.",
 ];
 
-export const BASH_FILE_GUIDELINES = [
-	"The read tool is unavailable. Read small text files with `cat -- PATH`; do not emit an unbounded file of unknown size.",
-	"Read an inclusive 1-based line range with `sed -n 'START,ENDp' -- PATH`. Read COUNT lines starting at 1-based START with `tail -n +START -- PATH | head -n COUNT`.",
-	"Prefer a command's own output limit. Otherwise bound large output with `head -n N` or `tail -n N`.",
-];
-
 export const PWSH_GUIDELINES = [
 	"The pwsh tool runs PowerShell 7, not bash/sh. Set environment variables with `$env:NAME = 'x'`, test paths with `Test-Path`, and invoke quoted executable paths with `& 'C:\\path\\app.exe' arg`.",
 	"Prefer single quotes for literal arguments. In double-quoted strings, PowerShell uses the backtick, not `\\`, for escaping. Prefer natural multiline syntax over fragile backtick line continuations.",
 	"PowerShell pipelines pass objects rather than text. Limit output with `Select-Object -First N` or `-Last N`, and locate commands with `(Get-Command name).Source`.",
-	"The read tool is unavailable. Read a text file with `Get-Content -LiteralPath 'path'`; add `-Raw` only when a single unbroken string is required.",
-	"Read COUNT lines after skipping zero-based SKIP lines with `Get-Content -LiteralPath 'path' | Select-Object -Skip SKIP -First COUNT`. User-facing line numbers are normally 1-based, so SKIP is START - 1.",
 	"For multiline native arguments, use a real multiline here-string: `@'` followed by a newline, the content, another newline, then `'@`. The opening marker must end its line and the closing marker must be alone at the start of a line.",
 	"Do not build a complete command string and pass it to `Invoke-Expression`; invoke executables directly and pass arguments separately.",
 ];
@@ -68,7 +60,7 @@ export function resolvePwsh7Path(
 	return undefined;
 }
 
-function mergeGuidelines(base: readonly string[] | undefined, extra: readonly string[]): string[] {
+function mergeGuidelines(base: readonly string[] | undefined, extra: readonly string[] = []): string[] {
 	return [...(base ?? []), ...COMMON_SHELL_GUIDELINES, ...extra];
 }
 
@@ -90,7 +82,7 @@ export function createEnhancedShell(
 			tool: {
 				...base,
 				name: "bash",
-				promptGuidelines: mergeGuidelines(base.promptGuidelines, BASH_FILE_GUIDELINES),
+				promptGuidelines: mergeGuidelines(base.promptGuidelines),
 			},
 		};
 	}
@@ -111,7 +103,7 @@ export function createEnhancedShell(
 			label: "pwsh",
 			description:
 				"Run a PowerShell 7 command in the current working directory. Output is truncated to the last 2,000 lines or 50 KB, with complete overflow saved to a temporary file. The user profile is loaded and TERM=dumb is set.",
-			promptSnippet: "Run PowerShell 7 commands and read text files",
+			promptSnippet: "Run PowerShell 7 commands",
 			promptGuidelines: mergeGuidelines(base.promptGuidelines, PWSH_GUIDELINES),
 		},
 	};

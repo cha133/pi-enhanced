@@ -5,7 +5,7 @@ import { join } from "node:path";
 import piEnhanced from "../extensions/pi-enhanced.js";
 
 describe("single extension entry", () => {
-	test("registers the enhanced surface and disables read on session start", async () => {
+	test("registers the enhanced surface and overrides read on session start", async () => {
 		const cwd = await mkdtemp(join(tmpdir(), "pi-enhanced-entry-"));
 		const handlers = new Map<string, Array<(...args: any[]) => unknown>>();
 		const tools = new Map<string, unknown>();
@@ -46,12 +46,13 @@ describe("single extension entry", () => {
 			piEnhanced(pi);
 			for (const handler of handlers.get("session_start") ?? []) await handler({}, ctx);
 			expect([...tools.keys()]).toContain("edit");
-			expect([...tools.keys()]).toContain("view_image");
+			expect([...tools.keys()]).toContain("read");
 			expect([...tools.keys()]).toContain("subagent");
 			expect([...tools.keys()].some((name) => name === "bash" || name === "pwsh")).toBe(true);
-			expect(active).not.toContain("read");
+			expect(active).toContain("read");
+			expect(active).not.toContain("view_image");
 			expect(active).toContain("third_party");
-			expect((tools.get("view_image") as { description: string }).description).toContain("external vision model");
+			expect((tools.get("read") as { description: string }).description).toContain("external vision model");
 
 			const promptResult = await handlers.get("before_agent_start")?.[0]?.({ systemPrompt: "base" }, ctx) as
 				| { systemPrompt: string }
@@ -61,7 +62,7 @@ describe("single extension entry", () => {
 
 			ctx.model = { provider: "test", id: "vision", name: "Vision Model", input: ["text", "image"] };
 			for (const handler of handlers.get("model_select") ?? []) await handler({}, ctx);
-			expect((tools.get("view_image") as { description: string }).description).toContain("inspect directly");
+			expect((tools.get("read") as { description: string }).description).toContain("direct inspection");
 		} finally {
 			for (const handler of handlers.get("session_shutdown") ?? []) await handler({}, ctx);
 			await rm(cwd, { recursive: true, force: true });

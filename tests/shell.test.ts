@@ -18,13 +18,16 @@ describe("PowerShell detection", () => {
 	test("falls back to an enhanced bash definition outside Windows", () => {
 		const shell = createEnhancedShell("C:\\repo", "linux", {});
 		expect(shell.name).toBe("bash");
-		expect(shell.tool.promptGuidelines?.join("\n")).toContain("sed -n");
 		expect(shell.tool.promptGuidelines?.join("\n")).toContain("rg --files");
+		expect(shell.tool.promptGuidelines?.join("\n")).not.toContain("cat -- PATH");
+		expect(shell.tool.promptGuidelines?.join("\n")).not.toContain("sed -n");
 	});
 
 	test("executes through PowerShell 7 with TERM=dumb when available", async () => {
 		const shell = createEnhancedShell(process.cwd());
 		if (shell.name !== "pwsh") return;
+		expect(shell.tool.promptSnippet).toBe("Run PowerShell 7 commands");
+		expect(shell.tool.promptGuidelines?.join("\n")).not.toContain("Get-Content");
 		const result = await (shell.tool.execute as any)(
 			"call",
 			{ command: "Write-Output \"$($PSVersionTable.PSVersion.Major)|$env:TERM\"", timeout: 10 },

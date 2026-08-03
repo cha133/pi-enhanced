@@ -20,9 +20,9 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { createEnhancedEditTool } from "./edit.js";
 import { bindMcpTools, type McpManager } from "./mcp.js";
+import { createEnhancedReadTool } from "./read.js";
 import { createEnhancedShell } from "./shell.js";
 import { loadModelRoute } from "./settings.js";
-import { createViewImageTool } from "./view-image.js";
 import { OneLine } from "./one-line.js";
 
 type ThinkingLevel = ReturnType<ExtensionAPI["getThinkingLevel"]>;
@@ -219,9 +219,8 @@ async function createChildSession(
 		pi.on("session_start", (_event, ctx) => {
 			pi.registerTool(shell.tool);
 			pi.registerTool(createEnhancedEditTool(ctx.cwd));
-			pi.registerTool(createViewImageTool(ctx.cwd, ctx));
+			pi.registerTool(createEnhancedReadTool(ctx.cwd, ctx));
 			const active = new Set(pi.getActiveTools());
-			active.delete("read");
 			active.delete("subagent");
 			if (shell.name === "pwsh") {
 				active.delete("bash");
@@ -231,7 +230,7 @@ async function createChildSession(
 			}
 			active.add("write");
 			active.add("edit");
-			active.add("view_image");
+			active.add("read");
 			pi.setActiveTools([...active]);
 			if (mcpManager) unbindMcp = bindMcpTools(pi, mcpManager);
 		});
