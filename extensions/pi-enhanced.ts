@@ -2,6 +2,7 @@ import { getAgentDir, type ExtensionAPI, type ExtensionContext } from "@earendil
 import { activateEnhancedTools } from "./lib/activation.js";
 import { createEnhancedEditTool } from "./lib/edit.js";
 import { createEnhancedReadTool } from "./lib/read.js";
+import { createEnhancedWriteTool } from "./lib/write.js";
 import { bindMcpTools, McpManager } from "./lib/mcp.js";
 import { createEnhancedShell, type ShellRegistration } from "./lib/shell.js";
 import { registerSessionInfo } from "./lib/session-info.js";
@@ -27,6 +28,7 @@ export default function piEnhanced(pi: ExtensionAPI): void {
 		shell = createEnhancedShell(ctx.cwd);
 		pi.registerTool(shell.tool);
 		pi.registerTool(createEnhancedEditTool(ctx.cwd));
+		pi.registerTool(createEnhancedWriteTool(ctx.cwd));
 		registerModelAwareTools(ctx);
 		activateEnhancedTools(pi, shell.name);
 

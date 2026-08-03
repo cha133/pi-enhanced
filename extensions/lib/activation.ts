@@ -10,6 +10,7 @@ export function activateEnhancedTools(pi: ExtensionAPI, shellName: "bash" | "pws
 	}
 	active.add("edit");
 	active.add("read");
+	active.add("write");
 	active.add("subagent");
 	pi.setActiveTools([...active]);
 }

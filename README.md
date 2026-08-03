@@ -1,6 +1,6 @@
 # pi-enhanced
 
-`pi-enhanced` is a single-entry pi package that keeps pi's native tool surface small while improving file reading, batch editing, image inspection, focused delegation, and direct MCP tool access.
+`pi-enhanced` is a single-entry pi package that keeps pi's native tool surface small while improving file reading and writing, batch editing, image inspection, focused delegation, and direct MCP tool access.
 
 Requires pi `0.83.0` or newer.
 
@@ -11,11 +11,12 @@ Requires pi `0.83.0` or newer.
 | `pwsh` | On Windows with PowerShell 7, replaces `bash`; loads the user profile, injects `TERM=dumb`, and includes PowerShell and ripgrep guidance. |
 | `bash` | On other systems, keeps pi's native execution and adds ripgrep workflow guidance. |
 | `read` | Replaces pi's reader while preserving native text pagination, image processing, and rendering; text-only models transparently delegate image inspection to the configured vision model. |
+| `write` | Temporarily replaces pi's writer with its native contract plus a Bun/Windows workaround for existing read-only parent directories. |
 | `edit` | Replaces pi's edit with partial-success batch replacement. Valid disjoint entries are applied atomically; invalid and overlapping entries are returned by index with bounded previews. |
 | `subagent` | Runs isolated peer/advisor child sessions with the effective platform toolset, compact live status, cancellation, usage accounting, and transcript export. |
 | `mcp_<server>_<tool>` | Exposes every discovered MCP tool directly to the model. The initial release supports Streamable HTTP and stdio servers; child agents reuse the parent's connections. |
 
-The built-in `read` name remains active and is overridden by the enhanced reader. The built-in `write` tool remains active, and there is no separate image-viewing tool.
+The built-in `read` and `write` names remain active and are overridden by enhanced definitions. The `write` override is a temporary compatibility fix and should be removed once pi or Bun handles recursive creation of existing read-only Windows directories correctly. There is no separate image-viewing tool.
 
 The extension also records the first user message's timestamp and first-turn model as fixed session metadata. It reuses that same information after later model switches and when the session is resumed.
 

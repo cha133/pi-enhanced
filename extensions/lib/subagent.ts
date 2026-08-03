@@ -24,6 +24,7 @@ import { createEnhancedReadTool } from "./read.js";
 import { createEnhancedShell } from "./shell.js";
 import { loadModelRoute } from "./settings.js";
 import { OneLine } from "./one-line.js";
+import { createEnhancedWriteTool } from "./write.js";
 
 type ThinkingLevel = ReturnType<ExtensionAPI["getThinkingLevel"]>;
 export type SubagentTier = "peer" | "advisor";
@@ -220,6 +221,7 @@ async function createChildSession(
 			pi.registerTool(shell.tool);
 			pi.registerTool(createEnhancedEditTool(ctx.cwd));
 			pi.registerTool(createEnhancedReadTool(ctx.cwd, ctx));
+			pi.registerTool(createEnhancedWriteTool(ctx.cwd));
 			const active = new Set(pi.getActiveTools());
 			active.delete("subagent");
 			if (shell.name === "pwsh") {

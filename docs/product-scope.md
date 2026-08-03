@@ -19,15 +19,15 @@
 
 ### 目标有效工具矩阵
 
-| 环境 | 原生 `bash` | 增强 `read` | 原生 `write` | 原生 `edit` | `pwsh` | 增强 `edit` | `subagent` | 已配置 MCP tools |
+| 环境 | 原生 `bash` | 增强 `read` | 增强 `write` | 原生 `edit` | `pwsh` | 增强 `edit` | `subagent` | 已配置 MCP tools |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Windows + pwsh 7 | 禁用 | 启用 | 保留 | 被覆盖 | 启用 | 启用 | 启用 | 后台发现后启用 |
-| Windows，无 pwsh 7 | 提示词被覆盖 | 启用 | 保留 | 被覆盖 | 不注册/不启用 | 启用 | 启用 | 后台发现后启用 |
-| 非 Windows | 提示词被覆盖 | 启用 | 保留 | 被覆盖 | 不注册/不启用 | 启用 | 启用 | 后台发现后启用 |
+| Windows + pwsh 7 | 禁用 | 启用 | 启用 | 被覆盖 | 启用 | 启用 | 启用 | 后台发现后启用 |
+| Windows，无 pwsh 7 | 提示词被覆盖 | 启用 | 启用 | 被覆盖 | 不注册/不启用 | 启用 | 启用 | 后台发现后启用 |
+| 非 Windows | 提示词被覆盖 | 启用 | 启用 | 被覆盖 | 不注册/不启用 | 启用 | 启用 | 后台发现后启用 |
 
 说明：
 
-- `write` 保持原生，负责新建或完整重写文件。
+- `write` 以同名定义保持原生 schema、路径解析、mutation queue、取消和渲染，仅临时替换本地目录创建操作，规避 Bun 在 Windows 上对带只读属性的现有目录错误抛出 `EEXIST`。官方 pi 或 Bun 修复后删除此覆盖。
 - 文本与图片统一通过增强 `read`；文本行为保持 pi 原生，图片在当前模型不支持 image input 时自动走 vision fallback。
 - fallback 环境保留原生 `bash` 执行实现，但同名 override 只增加通用 shell/ripgrep guidance，不指导模型用 shell 读取文件。
 - `read` 不引入 `pi-extensions` 的 hashline 格式或 session grounding 状态。

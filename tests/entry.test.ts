@@ -5,7 +5,7 @@ import { join } from "node:path";
 import piEnhanced from "../extensions/pi-enhanced.js";
 
 describe("single extension entry", () => {
-	test("registers the enhanced surface and overrides read on session start", async () => {
+	test("registers the enhanced surface and overrides read and write on session start", async () => {
 		const cwd = await mkdtemp(join(tmpdir(), "pi-enhanced-entry-"));
 		const handlers = new Map<string, Array<(...args: any[]) => unknown>>();
 		const tools = new Map<string, unknown>();
@@ -47,9 +47,11 @@ describe("single extension entry", () => {
 			for (const handler of handlers.get("session_start") ?? []) await handler({}, ctx);
 			expect([...tools.keys()]).toContain("edit");
 			expect([...tools.keys()]).toContain("read");
+			expect([...tools.keys()]).toContain("write");
 			expect([...tools.keys()]).toContain("subagent");
 			expect([...tools.keys()].some((name) => name === "bash" || name === "pwsh")).toBe(true);
 			expect(active).toContain("read");
+			expect(active).toContain("write");
 			expect(active).not.toContain("view_image");
 			expect(active).toContain("third_party");
 			expect((tools.get("read") as { description: string }).description).toContain("external vision model");
