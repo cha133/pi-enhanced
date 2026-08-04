@@ -113,6 +113,7 @@
 | D-032 | 标题 prompt 要求中文与英文单词之间保留一个空格；暂不增加确定性后处理，依赖当前模型遵循排版要求 | 用户确认 |
 | D-033 | 临时同名覆盖 `write`，保留原生 contract，仅修复 Bun/Windows 对带只读属性现有父目录错误抛出 `EEXIST`；官方 pi 或 Bun 修复后删除该覆盖 | 用户确认 |
 | D-034 | 父子 session 共用单一 child-safe 编码工具 surface；child 不反射复制第三方 registry，继承父 shell 启用状态，并以激活策略和 SDK denylist 双重禁止 `subagent` 递归 | 用户确认 |
+| D-035 | MCP client 在 `session_start` 后异步导入，避免 SDK 解析阻塞扩展加载；`PI_TIMING=1` 时额外记录 MCP 模块导入耗时 | 冷启动性能诊断 |
 
 ## 待确认决策
 

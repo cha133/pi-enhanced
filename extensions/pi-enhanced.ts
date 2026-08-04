@@ -1,6 +1,7 @@
 import { getAgentDir, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { activateEnhancedTools } from "./lib/activation.js";
-import { bindMcpTools, McpManager } from "./lib/mcp.js";
+import { bindMcpTools, type McpToolSource } from "./lib/mcp-binding.js";
+import type { McpManager } from "./lib/mcp.js";
 import { registerSessionInfo } from "./lib/session-info.js";
 import { registerSessionTitle } from "./lib/session-title.js";
 import { createSubagentTool, isAdvisorAvailable } from "./lib/subagent.js";
@@ -16,8 +17,10 @@ export default function piEnhanced(pi: ExtensionAPI): void {
 
 	let codingSurface: EnhancedCodingSurface | undefined;
 	let cwd: string | undefined;
-	let mcpManager: McpManager | undefined;
+	let mcpManager: (McpManager & McpToolSource) | undefined;
 	let unbindMcp: (() => void) | undefined;
+	let mcpInitialization: Promise<void> | undefined;
+	let mcpLifecycle: object | undefined;
 
 	const registerSubagent = (ctx: ExtensionContext) => {
 		pi.registerTool(createSubagentTool(
@@ -43,25 +46,38 @@ export default function piEnhanced(pi: ExtensionAPI): void {
 		registerSubagent(ctx);
 		activateSurface();
 
-		const reservedNames = pi.getAllTools().map((tool) => tool.name);
+		const lifecycle = {};
+		mcpLifecycle = lifecycle;
 		const reportMcpError = (message: string) => {
 			if (ctx.hasUI) ctx.ui.notify(`MCP: ${message}`, "error");
 			else console.error(`[pi-enhanced MCP] ${message}`);
 		};
-		const manager = new McpManager(
-			ctx.cwd,
-			getAgentDir(),
-			ctx.isProjectTrusted(),
-			(message) => {
-				if (mcpManager !== manager) return;
-				reportMcpError(message);
-			},
-			reservedNames,
-		);
-		mcpManager = manager;
-		unbindMcp = bindMcpTools(pi, manager);
-		void manager.start().catch((error: unknown) => {
-			if (mcpManager === manager) reportMcpError(error instanceof Error ? error.message : String(error));
+		mcpInitialization = (async () => {
+			const startedAt = performance.now();
+			const { McpManager } = await import("./lib/mcp.js");
+			if (process.env.PI_TIMING === "1") {
+				console.error(`[pi-enhanced timing] MCP module import: ${Math.round(performance.now() - startedAt)}ms`);
+			}
+			if (mcpLifecycle !== lifecycle) return;
+
+			const reservedNames = pi.getAllTools().map((tool) => tool.name);
+			const manager = new McpManager(
+				ctx.cwd,
+				getAgentDir(),
+				ctx.isProjectTrusted(),
+				(message) => {
+					if (mcpManager !== manager) return;
+					reportMcpError(message);
+				},
+				reservedNames,
+			);
+			mcpManager = manager;
+			unbindMcp = bindMcpTools(pi, manager);
+			void manager.start().catch((error: unknown) => {
+				if (mcpManager === manager) reportMcpError(error instanceof Error ? error.message : String(error));
+			});
+		})().catch((error: unknown) => {
+			if (mcpLifecycle === lifecycle) reportMcpError(error instanceof Error ? error.message : String(error));
 		});
 	});
 
@@ -73,6 +89,10 @@ export default function piEnhanced(pi: ExtensionAPI): void {
 	});
 
 	pi.on("session_shutdown", async () => {
+		mcpLifecycle = undefined;
+		const initialization = mcpInitialization;
+		mcpInitialization = undefined;
+		await initialization;
 		unbindMcp?.();
 		unbindMcp = undefined;
 		const manager = mcpManager;

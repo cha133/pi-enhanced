@@ -4,13 +4,13 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import type { Tool as McpSdkTool } from "@modelcontextprotocol/client";
 import {
-	bindMcpTools,
 	guardMcpOutput,
 	loadMcpConfig,
 	McpManager,
 	McpResultView,
 	type McpServerConfig,
 } from "../extensions/lib/mcp.js";
+import { bindMcpTools } from "../extensions/lib/mcp-binding.js";
 
 const firstTool: McpSdkTool = {
 	name: "web.search",

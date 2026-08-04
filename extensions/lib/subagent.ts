@@ -19,7 +19,7 @@ import {
 	type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { activateEnhancedTools } from "./activation.js";
-import { bindMcpTools, type McpManager } from "./mcp.js";
+import { bindMcpTools, type McpToolSource } from "./mcp-binding.js";
 import { loadModelRoute } from "./settings.js";
 import { OneLine } from "./one-line.js";
 import { registerEnhancedCodingSurface } from "./tool-surface.js";
@@ -204,7 +204,7 @@ function messageText(event: SessionEvent): string {
 }
 
 export function createSubagentChildExtension(
-	mcpManager: McpManager | undefined,
+	mcpManager: McpToolSource | undefined,
 	parentActiveToolNames: readonly string[] | undefined,
 ): (pi: ExtensionAPI) => void {
 	return (pi: ExtensionAPI) => {
@@ -231,7 +231,7 @@ async function createChildSession(
 	model: Model<any>,
 	thinkingLevel: ThinkingLevel,
 	projectTrusted: boolean,
-	mcpManager: McpManager | undefined,
+	mcpManager: McpToolSource | undefined,
 	parentActiveToolNames: readonly string[] | undefined,
 ): Promise<AgentSession> {
 	const agentDir = getAgentDir();
@@ -273,7 +273,7 @@ async function runSubagent(
 	model: Model<any>,
 	thinkingLevel: ThinkingLevel,
 	projectTrusted: boolean,
-	mcpManager: McpManager | undefined,
+	mcpManager: McpToolSource | undefined,
 	parentActiveToolNames: readonly string[] | undefined,
 	task: string,
 	signal: AbortSignal | undefined,
@@ -377,7 +377,7 @@ function createParameters(advisorAvailable: boolean) {
 export function createSubagentTool(
 	available: boolean,
 	getThinkingLevel: () => ThinkingLevel,
-	getMcpManager: () => McpManager | undefined = () => undefined,
+	getMcpManager: () => McpToolSource | undefined = () => undefined,
 	getParentActiveToolNames: () => readonly string[] | undefined = () => undefined,
 ): Parameters<ExtensionAPI["registerTool"]>[0] {
 	return {

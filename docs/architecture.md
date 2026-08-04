@@ -61,7 +61,7 @@ flowchart TD
 - session info 在第一轮 `before_agent_start` 才同时捕获时间与当前模型，并写入 `session-info` custom entry；后续轮次、模型切换和 session resume 始终复用固定 prompt。
 - session title 只处理没有历史用户消息、没有现有名称的新会话。第一轮 `before_agent_start` 立即启动不阻塞主回答的当前模型请求。请求不设置模型输出 token 上限；prompt 要求中文与英文单词混排时保留一个空格，标题长度由 prompt 和返回后的 60 字符清洗共同约束，不对中英文边界做代码改写。完成后通过 `setSessionName()` 持久化，请求失败或纯图片首条消息静默保留 pi 默认名称。
 - fork 不调用标题模型：若继承到名称，则把末尾 ` (n)` 递增，或首次追加 ` (1)`；未命名 fork 保留 pi 默认名称。
-- MCP manager 在 `session_start` 立即开始异步读取配置和连接，不等待 `before_agent_start`，因此不人为延迟首轮。每个 server 完成 `tools/list` 后批量刷新工具面；`tools/list_changed` 使用 SDK 的聚合结果继续刷新。`session_shutdown` 关闭 manager 与 transport。
+- MCP manager 在 `session_start` 后异步导入 MCP client、读取配置和连接，不等待 `before_agent_start`，因此 SDK 模块解析和 server discovery 都不阻塞扩展加载。每个 server 完成 `tools/list` 后批量刷新工具面；`tools/list_changed` 使用 SDK 的聚合结果继续刷新。`session_shutdown` 失效化或等待尚未完成的导入，并关闭 manager 与 transport。
 
 ## 复用边界
 
