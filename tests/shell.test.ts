@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { createEnhancedShell, resolvePwsh7Path } from "../extensions/lib/shell.js";
+import {
+	createEnhancedShell,
+	PWSH_GUIDELINES,
+	resolvePwsh7Path,
+} from "../extensions/lib/shell.js";
 
 describe("PowerShell detection", () => {
 	test("deduplicates candidates and returns the first existing pwsh executable", () => {
@@ -21,6 +25,14 @@ describe("PowerShell detection", () => {
 		expect(shell.tool.promptGuidelines?.join("\n")).toContain("rg --files");
 		expect(shell.tool.promptGuidelines?.join("\n")).not.toContain("cat -- PATH");
 		expect(shell.tool.promptGuidelines?.join("\n")).not.toContain("sed -n");
+		expect(shell.tool.promptGuidelines?.join("\n")).not.toContain("Never put shell wildcards in PATH");
+	});
+
+	test("pwsh guidelines teach --glob instead of shell wildcards in rg PATH", () => {
+		const text = PWSH_GUIDELINES.join("\n");
+		expect(text).toContain("--glob");
+		expect(text).toContain("Never put shell wildcards in PATH");
+		expect(text).toContain("dir/*.go");
 	});
 
 	test("executes through PowerShell 7 with TERM=dumb when available", async () => {
@@ -28,6 +40,7 @@ describe("PowerShell detection", () => {
 		if (shell.name !== "pwsh") return;
 		expect(shell.tool.promptSnippet).toBe("Run PowerShell 7 commands");
 		expect(shell.tool.promptGuidelines?.join("\n")).not.toContain("Get-Content");
+		expect(shell.tool.promptGuidelines?.join("\n")).toContain("Never put shell wildcards in PATH");
 		const result = await (shell.tool.execute as any)(
 			"call",
 			{ command: "Write-Output \"$($PSVersionTable.PSVersion.Major)|$env:TERM\"", timeout: 10 },

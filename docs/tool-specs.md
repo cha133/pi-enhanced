@@ -49,6 +49,7 @@
 - 不使用 `Invoke-Expression` 拼装整条命令。
 - PowerShell pipeline 传对象；限制输出用 `Select-Object -First N` / `-Last N`。
 - 文件发现优先 `rg --files`，内容搜索优先 `rg -n`；禁止误用 `rg -r`。
+- Windows 下用 `rg` 按文件名过滤时，PATH 只传目录（或 `.`），筛选用 `--glob`（如 `rg -n PATTERN dir --glob '*.go'` / `--glob '!*_test.go'`）；禁止写 `dir/*.go` 这类 shell 通配路径——pwsh 常原样传给 `rg`，而 Windows 路径不允许 `*`。
 - 非平凡分支、循环、结构化处理转为 `$env:TEMP` 下的临时 TypeScript，并用 Bun 执行。
 
 ### fallback `bash` guidance

@@ -17,6 +17,7 @@ export const PWSH_GUIDELINES = [
 	"PowerShell pipelines pass objects rather than text. Limit output with `Select-Object -First N` or `-Last N`, and locate commands with `(Get-Command name).Source`.",
 	"For multiline native arguments, use a real multiline here-string: `@'` followed by a newline, the content, another newline, then `'@`. The opening marker must end its line and the closing marker must be alone at the start of a line.",
 	"Do not build a complete command string and pass it to `Invoke-Expression`; invoke executables directly and pass arguments separately.",
+	"For rg file filters on Windows, pass a directory (or `.`) as PATH and use `--glob` (e.g. `rg -n PATTERN dir --glob '*.go'` or `--glob '!*_test.go'`). Never put shell wildcards in PATH like `dir/*.go`: PowerShell often leaves them literal, and Windows rejects `*` in pathnames.",
 ];
 
 function getEnv(environment: NodeJS.ProcessEnv, name: string): string | undefined {
