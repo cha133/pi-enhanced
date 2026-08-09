@@ -3,8 +3,6 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 export interface EnhancedToolActivation {
 	shellName: "bash" | "pwsh";
 	toolNames: Iterable<string>;
-	additionalToolNames?: Iterable<string>;
-	excludedToolNames?: Iterable<string>;
 }
 
 export function activateEnhancedTools(pi: ExtensionAPI, options: EnhancedToolActivation): void {
@@ -18,7 +16,5 @@ export function activateEnhancedTools(pi: ExtensionAPI, options: EnhancedToolAct
 	for (const name of options.toolNames) {
 		if (name !== "bash" && name !== "pwsh") active.add(name);
 	}
-	for (const name of options.additionalToolNames ?? []) active.add(name);
-	for (const name of options.excludedToolNames ?? []) active.delete(name);
 	pi.setActiveTools([...active]);
 }

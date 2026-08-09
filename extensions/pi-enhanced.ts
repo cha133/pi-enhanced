@@ -1,49 +1,45 @@
-import { getAgentDir, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { getAgentDir, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { activateEnhancedTools } from "./lib/activation.js";
+import { createEnhancedEditTool } from "./lib/edit.js";
 import { bindMcpTools, type McpToolSource } from "./lib/mcp-binding.js";
 import type { McpManager } from "./lib/mcp.js";
+import { createEnhancedReadTool } from "./lib/read.js";
 import { registerSessionInfo } from "./lib/session-info.js";
 import { registerSessionTitle } from "./lib/session-title.js";
-import { createSubagentTool, isAdvisorAvailable } from "./lib/subagent.js";
-import {
-	refreshModelAwareCodingSurface,
-	registerEnhancedCodingSurface,
-	type EnhancedCodingSurface,
-} from "./lib/tool-surface.js";
+import { createEnhancedShell, type ShellRegistration } from "./lib/shell.js";
+import { createEnhancedWriteTool } from "./lib/write.js";
 
 export default function piEnhanced(pi: ExtensionAPI): void {
 	registerSessionInfo(pi);
 	registerSessionTitle(pi);
 
-	let codingSurface: EnhancedCodingSurface | undefined;
+	let shell: ShellRegistration | undefined;
+	let enhancedToolNames: string[] = [];
 	let cwd: string | undefined;
 	let mcpManager: (McpManager & McpToolSource) | undefined;
 	let unbindMcp: (() => void) | undefined;
 	let mcpInitialization: Promise<void> | undefined;
 	let mcpLifecycle: object | undefined;
 
-	const registerSubagent = (ctx: ExtensionContext) => {
-		pi.registerTool(createSubagentTool(
-			isAdvisorAvailable(ctx),
-			() => pi.getThinkingLevel(),
-			() => mcpManager,
-			() => pi.getActiveTools(),
-		));
-	};
-
 	const activateSurface = () => {
-		if (!codingSurface) return;
+		if (!shell) return;
 		activateEnhancedTools(pi, {
-			shellName: codingSurface.shell.name,
-			toolNames: codingSurface.toolNames,
-			additionalToolNames: ["subagent"],
+			shellName: shell.name,
+			toolNames: enhancedToolNames,
 		});
 	};
 
 	pi.on("session_start", (_event, ctx) => {
 		cwd = ctx.cwd;
-		codingSurface = registerEnhancedCodingSurface(pi, ctx);
-		registerSubagent(ctx);
+		shell = createEnhancedShell(ctx.cwd);
+		const edit = createEnhancedEditTool(ctx.cwd);
+		const read = createEnhancedReadTool(ctx.cwd, ctx);
+		const write = createEnhancedWriteTool(ctx.cwd);
+		pi.registerTool(shell.tool);
+		pi.registerTool(edit);
+		pi.registerTool(read);
+		pi.registerTool(write);
+		enhancedToolNames = [shell.tool.name, edit.name, read.name, write.name];
 		activateSurface();
 
 		const lifecycle = {};
@@ -82,9 +78,8 @@ export default function piEnhanced(pi: ExtensionAPI): void {
 	});
 
 	pi.on("model_select", (_event, ctx) => {
-		if (!codingSurface || cwd !== ctx.cwd) return;
-		refreshModelAwareCodingSurface(pi, ctx);
-		registerSubagent(ctx);
+		if (!shell || cwd !== ctx.cwd) return;
+		pi.registerTool(createEnhancedReadTool(ctx.cwd, ctx));
 		activateSurface();
 	});
 

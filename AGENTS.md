@@ -2,7 +2,7 @@
 
 ## Project overview
 
-`pi-enhanced` is a TypeScript pi package with one public extension entry point. It replaces or augments pi's shell, edit, image, and delegation tools while preserving a minimal active tool surface. The supported pi baseline is `0.83.0`.
+`pi-enhanced` is a TypeScript pi package with one public extension entry point. It replaces or augments pi's shell, file, image, and MCP tools while preserving a minimal active tool surface. The supported pi baseline is `0.83.0`.
 
 Read `docs/README.md` first, then open only the design document relevant to the task. Treat `docs/tool-specs.md` as the behavioral contract and `docs/configuration-and-decisions.md` as the record of accepted product decisions.
 
@@ -20,8 +20,7 @@ Read `docs/README.md` first, then open only the design document relevant to the 
 - Compute active tools from the existing active set and preserve tools registered by other extensions.
 - On Windows, expose `pwsh` only when PowerShell 7 is found; otherwise preserve the enhanced native `bash` path.
 - Preserve `edit` partial-success semantics: classify replacements against one snapshot, reject every member of an overlap group, and commit accepted edits in one write.
-- Propagate cancellation and usage through nested vision and subagent calls, clean up resources in all terminal paths, and keep live progress compact.
-- Do not allow child agents to register `subagent` recursively.
+- Propagate cancellation and usage through nested vision calls, clean up resources in all terminal paths, and keep live progress compact.
 - Keep TypeScript strict and follow the existing tab-indented source style.
 - Update the relevant durable documentation whenever behavior, configuration, architecture, or a recorded decision changes. Do not recreate `.agents/docs`; use temporary task notes outside the committed documentation when needed.
 

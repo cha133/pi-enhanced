@@ -23,7 +23,6 @@ describe("single extension entry", () => {
 			setActiveTools(names: string[]) {
 				active = names;
 			},
-			getThinkingLevel: () => "medium",
 			getSessionName: () => undefined,
 			setSessionName: () => {},
 			appendEntry(customType: string, data: unknown) {
@@ -48,7 +47,6 @@ describe("single extension entry", () => {
 			expect([...tools.keys()]).toContain("edit");
 			expect([...tools.keys()]).toContain("read");
 			expect([...tools.keys()]).toContain("write");
-			expect([...tools.keys()]).toContain("subagent");
 			expect([...tools.keys()].some((name) => name === "bash" || name === "pwsh")).toBe(true);
 			expect(active).toContain("read");
 			expect(active).toContain("write");

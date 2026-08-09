@@ -13,9 +13,8 @@ describe("tool activation", () => {
 		activateEnhancedTools(pi, {
 			shellName: "pwsh",
 			toolNames: ["pwsh", "read", "edit", "write"],
-			additionalToolNames: ["subagent"],
 		});
-		expect(active).toEqual(["read", "edit", "write", "third_party", "pwsh", "subagent"]);
+		expect(active).toEqual(["read", "edit", "write", "third_party", "pwsh"]);
 	});
 
 	test("keeps an already disabled bash disabled in fallback mode", () => {
@@ -29,7 +28,6 @@ describe("tool activation", () => {
 		activateEnhancedTools(pi, {
 			shellName: "bash",
 			toolNames: ["bash", "read", "edit", "write"],
-			additionalToolNames: ["subagent"],
 		});
 		expect(active).toContain("read");
 		expect(active).not.toContain("bash");

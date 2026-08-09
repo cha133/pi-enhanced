@@ -16,10 +16,6 @@
   "vision": {
     "provider": "openai",
     "model": "vision-model-id"
-  },
-  "advisor": {
-    "provider": "anthropic",
-    "model": "advisor-model-id"
   }
 }
 ```
@@ -29,12 +25,6 @@
 - 可选；仅文本模型通过 `read` 读取图片时要求存在。
 - 必须含非空字符串 `provider` 与 `model`。
 - 指向的模型必须已在 pi model registry 中存在且声明 image input。
-
-### `advisor`
-
-- 可选；缺省时 subagent 只有继承当前模型的 peer。
-- 必须含非空字符串 `provider` 与 `model`。
-- advisor 与当前主模型按 provider + model id 一起比较；相同则不暴露 advisor tier。
 
 ## MCP 配置
 
@@ -70,8 +60,6 @@
 
 ### 不建议保留的配置
 
-- 不保留 `subagent.peer`：peer 的定义就是当前模型，减少配置和概念。
-- 不保留 `subagent.advisor`：按用户要求扁平为顶层 `advisor`。
 - 不增加 pwsh 路径配置：先自动探测；只有真实用户需求出现时再考虑 override。
 - 不增加 session title 模型配置：标题固定请求第一条消息触发时的当前模型。
 
@@ -85,16 +73,14 @@
 | D-004 | 覆盖 `edit`，并允许批量 replacements 部分成功 | 用户需求 |
 | D-005 | 单独提供 `view_image`，兼容多模态与 vision fallback（已由 D-031 取代） | 用户需求 |
 | D-006 | vision fallback 期间用户可看到模型实时进展 | 用户需求 |
-| D-007 | 提供 `subagent`，advisor 与 vision 采用同层配置 | 用户需求 |
 | D-008 | 单入口允许导入内部模块，package manifest 只暴露一个扩展入口 | 用户确认 |
 | D-009 | 所有平台禁用 `read`；fallback 环境静默保留并增强原生 `bash` 的 prompt metadata（已由 D-031 取代） | 用户确认 |
 | D-010 | `view_image` 使用 path/query/detail；多模态原生消费，纯文本走明确标识的外挂 vision，prompt metadata 随模型能力变化（已由 D-031 取代） | 用户确认 |
 | D-011 | vision fallback 失败返回普通结果，不抛工具错误 | 用户确认 |
-| D-012 | subagent 保留 peer/advisor tier，advisor 配置扁平化，子 agent 继承平台有效工具集 | 用户确认 |
 | D-013 | 包名 `pi-enhanced`、MIT、GitHub 直接安装；首个完成版本为 0.1.0；最低 pi 0.83.0 | 用户确认 |
 | D-014 | edit 重叠组全部拒绝，其他正确项合并成一次原子写盘 | 用户确认 |
 | D-015 | edit rejected 仅回传索引、错误信息和明确标注为不完整的有界预览 | 用户确认 |
-| D-016 | vision fallback 使用与 read vision/subagent 一致的紧凑单行实时状态 | 用户确认 |
+| D-016 | vision fallback 使用紧凑单行实时状态 | 用户确认 |
 | D-017 | 图片 detail 只控制分析深度；图片沿用 pi 自动等比缩放，不提供原始分辨率开关 | 用户确认 |
 | D-018 | pwsh 7 加载用户 profile 并注入 `TERM=dumb` | 用户确认 |
 | D-019 | edit 的参数级错误局部拒绝；即使全部 rejected 也返回普通结果，只有 I/O、取消或内部错误抛 tool error | 对齐结论 |
@@ -106,14 +92,13 @@
 | D-025 | MCP 初版只支持 Streamable HTTP 与 stdio，配置路径固定为全局 `~/.pi/agent/mcp.json` 和可信项目 `<cwd>/.mcp.json` | 用户确认 |
 | D-026 | MCP tools 直接作为普通模型工具暴露，不增加代理式 `mcp` list/search 步骤 | 用户确认 |
 | D-027 | MCP discovery 在 session 启动时后台执行，不阻塞首条用户请求；目录完成或变化后动态刷新工具面 | 用户确认 |
-| D-028 | 父 session 持有 MCP manager/transport，subagent 共享连接与工具目录并继续禁止递归 delegation | 用户确认 |
 | D-029 | MCP 使用官方 TypeScript SDK，原始 inputSchema 交给 Pi 的 raw JSON Schema/provider 兼容路径，只在证据表明需要时增加定向转换 | 对齐结论 |
 | D-030 | MCP 模型侧文本统一限制为 50 KB / 2,000 行并把完整超限文本写入临时文件；TUI 独立折叠为 3 行/约 800 字符，展开不绕过模型侧硬上限 | 用户确认 |
 | D-031 | 不再指导模型通过 shell 读取文件；以同名增强 `read` 覆盖原生工具，完整保留原生文本/图片行为，仅为纯文本模型增加 `image.query/detail` vision fallback；删除 `view_image`，且不引入 hashline | 用户确认 |
 | D-032 | 标题 prompt 要求中文与英文单词之间保留一个空格；暂不增加确定性后处理，依赖当前模型遵循排版要求 | 用户确认 |
 | D-033 | 临时同名覆盖 `write`，保留原生 contract，仅修复 Bun/Windows 对带只读属性现有父目录错误抛出 `EEXIST`；官方 pi 或 Bun 修复后删除该覆盖 | 用户确认 |
-| D-034 | 父子 session 共用单一 child-safe 编码工具 surface；child 不反射复制第三方 registry，继承父 shell 启用状态，并以激活策略和 SDK denylist 双重禁止 `subagent` 递归 | 用户确认 |
 | D-035 | MCP client 在 `session_start` 后异步导入，避免 SDK 解析阻塞扩展加载；`PI_TIMING=1` 时额外记录 MCP 模块导入耗时 | 冷启动性能诊断 |
+| D-036 | 移除低频且无法由用户即时干预的子代理工具、顾问模型配置和全部子会话适配层 | 用户需求 |
 
 ## 待确认决策
 

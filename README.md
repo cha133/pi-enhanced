@@ -1,6 +1,6 @@
 # pi-enhanced
 
-`pi-enhanced` is a single-entry pi package that keeps pi's native tool surface small while improving file reading and writing, batch editing, image inspection, focused delegation, and direct MCP tool access.
+`pi-enhanced` is a single-entry pi package that keeps pi's native tool surface small while improving file reading and writing, batch editing, image inspection, and direct MCP tool access.
 
 Requires pi `0.83.0` or newer.
 
@@ -13,8 +13,7 @@ Requires pi `0.83.0` or newer.
 | `read` | Replaces pi's reader while preserving native text pagination, image processing, and rendering; text-only models transparently delegate image inspection to the configured vision model. |
 | `write` | Temporarily replaces pi's writer with its native contract plus a Bun/Windows workaround for existing read-only parent directories. |
 | `edit` | Replaces pi's edit with partial-success batch replacement. Valid disjoint entries are applied atomically; invalid and overlapping entries are returned by index with bounded previews. |
-| `subagent` | Runs isolated peer/advisor child sessions with the effective platform toolset, compact live status, cancellation, usage accounting, and transcript export. |
-| `mcp_<server>_<tool>` | Exposes every discovered MCP tool directly to the model. The initial release supports Streamable HTTP and stdio servers; child agents reuse the parent's connections. |
+| `mcp_<server>_<tool>` | Exposes every discovered MCP tool directly to the model. The initial release supports Streamable HTTP and stdio servers. |
 
 The built-in `read` and `write` names remain active and are overridden by enhanced definitions. The `write` override is a temporary compatibility fix and should be removed once pi or Bun handles recursive creation of existing read-only Windows directories correctly. There is no separate image-viewing tool.
 
@@ -40,17 +39,13 @@ The package manifest exposes only `extensions/pi-enhanced.ts`; its internal modu
 
 ## Configuration
 
-No configuration is required for shell, edit, peer subagents, or multimodal image inspection. Optional model routes live at the top level of `~/.pi/agent/settings.json`:
+No configuration is required for shell, edit, or multimodal image inspection. The optional vision route lives at the top level of `~/.pi/agent/settings.json`:
 
 ```json
 {
   "vision": {
     "provider": "openai",
     "model": "image-capable-model-id"
-  },
-  "advisor": {
-    "provider": "anthropic",
-    "model": "higher-capability-model-id"
   }
 }
 ```
@@ -58,8 +53,6 @@ No configuration is required for shell, edit, peer subagents, or multimodal imag
 Trusted projects may override individual fields in `.pi/settings.json`.
 
 - `vision` is required only when the current model cannot consume images. It must resolve to an image-capable model already registered in pi.
-- `advisor` is optional. The advisor tier appears only when the configured model exists and differs from the current model.
-- Peer subagents always inherit the current model and thinking level.
 
 MCP servers use a separate `mcpServers` configuration. Global servers live in `~/.pi/agent/mcp.json`; trusted projects may add or replace servers by name in `<project>/.mcp.json`:
 

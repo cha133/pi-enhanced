@@ -7,7 +7,6 @@
 - 保持 pi 0.83.0 原生 `write` 的输入 schema、路径解析、mutation queue、取消检查、UTF-8 完整写入、返回文本和 TUI renderer。
 - 只替换本地 `mkdir` / `writeFile` operations；父目录仍使用 recursive mkdir 创建。
 - 若 recursive mkdir 抛出 `EEXIST`，必须再以 `stat` 确认该路径确实是目录才继续写入。路径是文件、无法确认或任何其他错误均原样失败。
-- 主 session 与 subagent 使用同一增强定义。
 
 此覆盖专门规避 Bun 在 Windows 上对带只读属性的现有目录执行 recursive mkdir 时错误抛出 `EEXIST`。这是临时修复；升级 pi 或 Bun 时应先回归该场景，确认上游已修复后删除增强 `write`、注册代码与对应兼容测试，恢复原生工具。
 
@@ -184,34 +183,13 @@ schema：
 
 工具 description/guidelines 明确说明当前模型不能直接看图，`read` 会调用外挂 vision 模型，返回值是该模型的视觉描述而非当前模型的直接观察。
 
-“实时看到回复”指沿用 `pi-extensions` read vision 与 subagent 的显示方式：TUI 中持续更新一行最新 thinking/reply 摘要，不把完整中间 token stream 永久写入父 transcript。
+“实时看到回复”指 TUI 中持续更新一行最新 thinking/reply 摘要，不把完整中间 token stream 永久写入 transcript。
 
 ### 错误
 
 - 路径、格式或读取失败：沿用原生 `read` 行为；无法处理成 image content 时不错误触发 fallback。
 - 缺少/错误 vision 配置、模型不支持图片、认证或 provider 错误：返回 `[Vision fallback failed: ...]` 普通文本结果，让主模型能解释或恢复。
 - fallback 最终没有文本：同上。
-
-## `subagent`
-
-### 基本行为
-
-- 工具名 `subagent`，`executionMode: "parallel"`。
-- 参数至少包含 `title`、`task`；advisor 可用时增加可选 `tier: "peer" | "advisor"`，默认 peer。
-- peer 始终继承当前主模型、thinking level、cwd 与 project trust。
-- advisor 使用顶层 `advisor` 配置，且仅在模型存在并不同于主模型时暴露。
-- 子任务必须自包含，并明确是否授权修改文件。
-- 子 agent 不得再调用 `subagent`。
-
-### 生命周期与输出
-
-- 直接通过 pi SDK 创建隔离的内存 session，并绑定所需扩展。
-- 子 session 工具集合由父子共用的 child-safe surface 定案；新增普通增强编码工具只登记一次。child 继承父 session 当前 shell 的启用状态，但不反射复制第三方扩展工具。
-- `subagent` 同时从 child 激活策略中移除，并通过 SDK `excludeTools` denylist 禁用；子 agent 即使未来调整共享注册逻辑也不能递归 delegation。
-- 将 reasoning、tool activity、reply 归约为紧凑状态，通过 `onUpdate` 展示；阶段使用小写前缀，终态显示 `finished · MODEL`。
-- 只把 final report 返回主模型；完整 JSONL transcript 存系统临时目录，路径作为内部审计元数据。
-- 传播 abort；无论成功、失败或取消，都 unsubscribe、导出 transcript、abort、发 shutdown、dispose。
-- 汇总并返回嵌套 usage。
 
 ## MCP 直接工具
 
@@ -244,4 +222,3 @@ schema：
 - session 启动后后台连接，不阻塞用户首条消息。
 - server 初次 `tools/list` 完成后注册并激活工具；尚未完成的 server 从后续模型请求开始可用。
 - `tools/list_changed` 重新同步该 server 的完整目录；新增项激活，删除项停用，相同目录不会改变工具命名。
-- subagent 订阅同一 manager，因此继承当前及运行期间新发现的 MCP 工具，但不会创建或关闭额外连接。

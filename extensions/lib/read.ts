@@ -19,7 +19,7 @@ import {
 	type ExtensionContext,
 	type ReadToolDetails,
 } from "@earendil-works/pi-coding-agent";
-import { loadModelRoute } from "./settings.js";
+import { loadVisionRoute } from "./settings.js";
 import { OneLine } from "./one-line.js";
 
 const SYSTEM_PROMPTS = {
@@ -138,7 +138,7 @@ async function delegateVision(
 ) {
 	let route;
 	try {
-		route = loadModelRoute(ctx, "vision", true)!;
+		route = loadVisionRoute(ctx, true)!;
 	} catch (error: unknown) {
 		return failure(error instanceof Error ? error.message : String(error));
 	}
