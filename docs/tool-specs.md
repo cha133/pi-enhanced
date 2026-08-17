@@ -44,6 +44,7 @@
 
 - 明示工具运行 PowerShell 7，不是 bash/sh。
 - 环境变量使用 `$env:NAME`，路径检查使用 `Test-Path`，带空格的可执行路径用调用运算符 `&`。
+- 后续命令依赖前一步成功时使用 `&&`，失败处理使用 `||`；仅在后续命令必须无条件执行时使用 `;`。验证与破坏性修改不得用 `;` 串联，多步骤修改改用显式检查或 fail-fast 临时脚本。
 - 优先单引号表达字面量；说明双引号插值与反引号转义。
 - 不使用 `Invoke-Expression` 拼装整条命令。
 - PowerShell pipeline 传对象；限制输出用 `Select-Object -First N` / `-Last N`。

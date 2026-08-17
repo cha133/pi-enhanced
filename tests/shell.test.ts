@@ -35,6 +35,14 @@ describe("PowerShell detection", () => {
 		expect(text).toContain("dir/*.go");
 	});
 
+	test("pwsh guidelines distinguish conditional and unconditional command chains", () => {
+		const text = PWSH_GUIDELINES.join("\n");
+		expect(text).toContain("Use `&&`");
+		expect(text).toContain("`||` for failure handling");
+		expect(text).toContain("`;` only when");
+		expect(text).toContain("Never join validation and destructive mutation with `;`");
+	});
+
 	test("executes through PowerShell 7 with TERM=dumb when available", async () => {
 		const shell = createEnhancedShell(process.cwd());
 		if (shell.name !== "pwsh") return;

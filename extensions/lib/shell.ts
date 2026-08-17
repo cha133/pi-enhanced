@@ -13,6 +13,7 @@ export const COMMON_SHELL_GUIDELINES = [
 
 export const PWSH_GUIDELINES = [
 	"The pwsh tool runs PowerShell 7, not bash/sh. Set environment variables with `$env:NAME = 'x'`, test paths with `Test-Path`, and invoke quoted executable paths with `& 'C:\\path\\app.exe' arg`.",
+	"Use `&&` when a later command depends on an earlier command succeeding, `||` for failure handling, and `;` only when the next command must run unconditionally. Never join validation and destructive mutation with `;`; use explicit checks or a fail-fast temporary script for multi-step changes.",
 	"Prefer single quotes for literal arguments. In double-quoted strings, PowerShell uses the backtick, not `\\`, for escaping. Prefer natural multiline syntax over fragile backtick line continuations.",
 	"PowerShell pipelines pass objects rather than text. Limit output with `Select-Object -First N` or `-Last N`, and locate commands with `(Get-Command name).Source`.",
 	"For multiline native arguments, use a real multiline here-string: `@'` followed by a newline, the content, another newline, then `'@`. The opening marker must end its line and the closing marker must be alone at the start of a line.",
