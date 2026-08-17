@@ -2,12 +2,13 @@ import { constants } from "node:fs";
 import { access, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import { Container, Text } from "@earendil-works/pi-tui";
+import { Container, Text, type Component } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import {
 	createEditToolDefinition,
 	generateDiffString,
 	generateUnifiedPatch,
+	keyHint,
 	withFileMutationQueue,
 	type EditToolInput,
 } from "@earendil-works/pi-coding-agent";
@@ -337,7 +338,22 @@ export function createEnhancedEditTool(cwd: string): ReturnType<typeof createEdi
 			const summary = `Applied ${applied}; rejected ${rejected.length}`;
 			const output = options.expanded
 				? [summary, ...rejected.map((item) => `edits[${item.index}] (${item.code}): ${item.message}`)].join("\n")
-				: `${summary} · Ctrl+O to expand`;
+				: `${summary} · ${keyHint("app.tools.expand", "to expand")}`;
+			const callComponent = (context.state as {
+				callComponent?: {
+					children: Component[];
+					addChild(component: Component): void;
+					removeChild(component: Component): void;
+				};
+			}).callComponent;
+			if (callComponent && Array.isArray(callComponent.children)) {
+				if (applied === 0 && details?.diff === "") {
+					const emptyDiff = callComponent.children.at(-1);
+					if (emptyDiff) callComponent.removeChild(emptyDiff);
+				}
+				callComponent.addChild(new Text(theme.fg("warning", output), 0, 0));
+				return component;
+			}
 			component.addChild(new Text(theme.fg("warning", output), 1, 0));
 			return component;
 		},

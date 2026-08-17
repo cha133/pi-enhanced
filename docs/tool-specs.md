@@ -136,8 +136,8 @@ details：
 
 - 复用 pi 原生 edit 的 self-rendered box、路径显示、调用期 diff 预览、背景状态和组件复用；普通全成功调用保持原生布局，不额外显示成功摘要。
 - 结果落定后把实际落盘 diff 回填到调用区域；部分成功时以实际 diff 替换可能基于完整输入产生的调用期预览或预检错误。
-- 部分成功使用成功/警告语义，不显示成全红失败；警告放在原生 diff 下方。
-- rejected 警告紧接原生调用框或 diff 显示，不额外插入空行。
+- 部分成功使用成功/警告语义，不显示成全红失败；警告放在原生 edit 调用框内、实际 diff 下方。
+- rejected-only 结果复用原生调用框的 header/body 间距，不渲染空 diff 行或框外空行。
 - rejected 摘要在折叠视图仅显示 applied/rejected 数量和 `Ctrl+O` 提示，expanded 展示每项索引、reason code 与原因。
 
 ## `read`

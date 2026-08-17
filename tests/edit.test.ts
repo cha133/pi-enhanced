@@ -139,8 +139,12 @@ describe("partial edit", () => {
 			const collapsed = component.render(80).join("\n");
 			expect(collapsed).toContain("ALPHA");
 			expect(collapsed).toContain("Applied 1; rejected 1");
-			expect(collapsed).toContain("Ctrl+O to expand");
+			expect(collapsed).toContain("to expand");
 			expect(collapsed).not.toContain("oldText was not found");
+			expect((component as any).callRendererComponent.render(80).join("\n")).toContain(
+				"Applied 1; rejected 1",
+			);
+			expect((component as any).resultRendererComponent.render(80)).toEqual([]);
 
 			component.setExpanded(true);
 			const expanded = component.render(80).join("\n");
@@ -175,6 +179,29 @@ describe("partial edit", () => {
 				} as any,
 			);
 			expect(rendered.render(80)[0]).toContain("Applied 0; rejected 1");
+		} finally {
+			await rm(cwd, { recursive: true, force: true });
+		}
+	});
+
+	test("renders a rejected-only summary inside the native edit box without an empty diff row", async () => {
+		const cwd = await mkdtemp(join(tmpdir(), "pi-enhanced-edit-render-"));
+		const path = join(cwd, "sample.txt");
+		await writeFile(path, "alpha\n", "utf8");
+		const tool = createEnhancedEditTool(cwd);
+		const args = {
+			path: "sample.txt",
+			edits: [{ oldText: "missing", newText: "present" }],
+		};
+		try {
+			const component = new ToolExecutionComponent("edit", "call", args, {}, tool, quietTui, cwd);
+			const result = await tool.execute("call", args, undefined, undefined, {} as any);
+			component.updateResult({ ...result, isError: false });
+
+			const callComponent = (component as any).callRendererComponent;
+			expect(callComponent.children).toHaveLength(3);
+			expect(callComponent.render(80).join("\n")).toContain("Applied 0; rejected 1");
+			expect((component as any).resultRendererComponent.render(80)).toEqual([]);
 		} finally {
 			await rm(cwd, { recursive: true, force: true });
 		}
