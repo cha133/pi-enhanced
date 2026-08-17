@@ -150,4 +150,33 @@ describe("partial edit", () => {
 			await rm(cwd, { recursive: true, force: true });
 		}
 	});
+
+	test("renders a rejected-only summary without a leading blank line", async () => {
+		const cwd = await mkdtemp(join(tmpdir(), "pi-enhanced-edit-render-"));
+		const path = join(cwd, "sample.txt");
+		await writeFile(path, "alpha\n", "utf8");
+		const tool = createEnhancedEditTool(cwd);
+		const args = {
+			path: "sample.txt",
+			edits: [{ oldText: "missing", newText: "present" }],
+		};
+		try {
+			const result = await tool.execute("call", args, undefined, undefined, {} as any);
+			const rendered = tool.renderResult!(
+				result as any,
+				{ expanded: false, isPartial: false } as any,
+				{ fg: (_color: string, text: string) => text } as any,
+				{
+					args,
+					cwd,
+					isError: false,
+					lastComponent: undefined,
+					state: {},
+				} as any,
+			);
+			expect(rendered.render(80)[0]).toContain("Applied 0; rejected 1");
+		} finally {
+			await rm(cwd, { recursive: true, force: true });
+		}
+	});
 });

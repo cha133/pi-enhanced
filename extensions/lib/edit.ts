@@ -2,7 +2,7 @@ import { constants } from "node:fs";
 import { access, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import { Container, Spacer, Text } from "@earendil-works/pi-tui";
+import { Container, Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import {
 	createEditToolDefinition,
@@ -338,7 +338,6 @@ export function createEnhancedEditTool(cwd: string): ReturnType<typeof createEdi
 			const output = options.expanded
 				? [summary, ...rejected.map((item) => `edits[${item.index}] (${item.code}): ${item.message}`)].join("\n")
 				: `${summary} · Ctrl+O to expand`;
-			component.addChild(new Spacer(1));
 			component.addChild(new Text(theme.fg("warning", output), 1, 0));
 			return component;
 		},
