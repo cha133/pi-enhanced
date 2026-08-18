@@ -287,10 +287,11 @@ describe("MCP output guard", () => {
 describe("MCP result rendering", () => {
 	test("collapses long output to three content rows and expands on demand", () => {
 		const text = "result ".repeat(400);
-		const collapsed = new McpResultView("MCP exa/search", text, false).render(80);
-		const expanded = new McpResultView("MCP exa/search", text, true).render(80);
+		const collapsed = new McpResultView(text, false).render(80);
+		const expanded = new McpResultView(text, true).render(80);
 
-		expect(collapsed).toHaveLength(5);
+		expect(collapsed).toHaveLength(4);
+		expect(collapsed[0]).toStartWith("result");
 		expect(collapsed.at(-1)).toContain("Ctrl+O to expand");
 		expect(expanded.length).toBeGreaterThan(collapsed.length);
 		expect(expanded.join("\n")).not.toContain("Ctrl+O to expand");

@@ -399,35 +399,29 @@ function resultDisplayText(content: PiContent[]): string {
 }
 
 export class McpResultView implements Component {
-	private readonly identityText: Text;
 	private readonly fullText: Text;
 
 	constructor(
-		identity: string,
 		private readonly text: string,
 		private readonly expanded: boolean,
-		private readonly identityStyle: (text: string) => string = (value) => value,
 		private readonly outputStyle: (text: string) => string = (value) => value,
 		private readonly mutedStyle: (text: string) => string = (value) => value,
 	) {
-		this.identityText = new Text(this.identityStyle(identity), 0, 0);
 		this.fullText = new Text(this.outputStyle(text), 0, 0);
 	}
 
 	render(width: number): string[] {
-		const identity = this.identityText.render(width);
-		if (this.expanded) return [...identity, ...this.fullText.render(width)];
+		if (this.expanded) return this.fullText.render(width);
 
 		const prefix = this.text.slice(0, MCP_COLLAPSED_MAX_CHARS);
 		const rendered = new Text(this.outputStyle(prefix), 0, 0).render(width);
 		const clipped = prefix.length < this.text.length || rendered.length > MCP_COLLAPSED_MAX_LINES;
 		return clipped
 			? [
-					...identity,
 					...rendered.slice(0, MCP_COLLAPSED_MAX_LINES),
 					this.mutedStyle("… (Ctrl+O to expand)"),
 				]
-			: [...identity, ...rendered];
+			: rendered;
 	}
 
 	invalidate(): void {}
@@ -573,14 +567,10 @@ export class McpManager {
 				};
 			},
 			renderResult(result, options, theme) {
-				if (options.isPartial) return new Text(theme.fg("warning", `MCP ${server}/${tool.name}…`), 0, 0);
-				const details = result.details as McpToolDetails | undefined;
-				const identity = `MCP ${details?.server ?? server}/${details?.tool ?? tool.name}`;
+				if (options.isPartial) return new Text(theme.fg("warning", "Running…"), 0, 0);
 				return new McpResultView(
-					identity,
 					resultDisplayText(result.content as PiContent[]),
 					options.expanded,
-					(text) => theme.fg("muted", text),
 					(text) => theme.fg("toolOutput", text),
 					(text) => theme.fg("muted", text),
 				);
