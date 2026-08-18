@@ -9,7 +9,14 @@ describe("single extension entry", () => {
 		const cwd = await mkdtemp(join(tmpdir(), "pi-enhanced-entry-"));
 		const handlers = new Map<string, Array<(...args: any[]) => unknown>>();
 		const tools = new Map<string, unknown>();
-		const entries: unknown[] = [];
+		const entries: unknown[] = [{
+			type: "message",
+			message: {
+				role: "toolResult",
+				toolName: "mcp_unity_get_editor_state",
+				details: {},
+			},
+		}];
 		let active = ["read", "bash", "edit", "write", "third_party"];
 		const pi = {
 			on(name: string, handler: (...args: any[]) => unknown) {
@@ -38,6 +45,7 @@ describe("single extension entry", () => {
 				getSessionId: () => "session-1",
 				getEntries: () => entries,
 				getBranch: () => entries,
+				buildContextEntries: () => entries,
 			},
 		} as any;
 
@@ -53,6 +61,16 @@ describe("single extension entry", () => {
 			expect(active).not.toContain("view_image");
 			expect(active).toContain("third_party");
 			expect((tools.get("read") as { description: string }).description).toContain("external vision model");
+			const historicalMcp = tools.get("mcp_unity_get_editor_state") as any;
+			expect(historicalMcp).toBeDefined();
+			expect(active).not.toContain("mcp_unity_get_editor_state");
+			const collapsed = historicalMcp.renderResult(
+				{ content: [{ type: "text", text: "line\n".repeat(20) }] },
+				{ expanded: false, isPartial: false },
+				{ fg: (_color: string, text: string) => text },
+			).render(80);
+			expect(collapsed).toHaveLength(4);
+			expect(collapsed.at(-1)).toContain("Ctrl+O to expand");
 
 			const promptResult = await handlers.get("before_agent_start")?.[0]?.({ systemPrompt: "base" }, ctx) as
 				| { systemPrompt: string }

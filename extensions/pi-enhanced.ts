@@ -2,6 +2,7 @@ import { getAgentDir, type ExtensionAPI } from "@earendil-works/pi-coding-agent"
 import { activateEnhancedTools } from "./lib/activation.js";
 import { createEnhancedEditTool } from "./lib/edit.js";
 import { bindMcpTools, type McpToolSource } from "./lib/mcp-binding.js";
+import { collectHistoricalMcpToolNames, createHistoricalMcpToolDefinition } from "./lib/mcp-rendering.js";
 import type { McpManager } from "./lib/mcp.js";
 import { createEnhancedReadTool } from "./lib/read.js";
 import { registerSessionInfo } from "./lib/session-info.js";
@@ -42,6 +43,15 @@ export default function piEnhanced(pi: ExtensionAPI): void {
 		enhancedToolNames = [shell.tool.name, edit.name, read.name, write.name];
 		activateSurface();
 
+		const registeredNames = new Set(pi.getAllTools().map((tool) => tool.name));
+		const historicalMcpNames = collectHistoricalMcpToolNames(ctx.sessionManager.buildContextEntries());
+		const placeholderNames = new Set<string>();
+		for (const name of historicalMcpNames) {
+			if (registeredNames.has(name)) continue;
+			pi.registerTool(createHistoricalMcpToolDefinition(name));
+			placeholderNames.add(name);
+		}
+
 		const lifecycle = {};
 		mcpLifecycle = lifecycle;
 		const reportMcpError = (message: string) => {
@@ -56,7 +66,7 @@ export default function piEnhanced(pi: ExtensionAPI): void {
 			}
 			if (mcpLifecycle !== lifecycle) return;
 
-			const reservedNames = pi.getAllTools().map((tool) => tool.name);
+			const reservedNames = pi.getAllTools().map((tool) => tool.name).filter((name) => !placeholderNames.has(name));
 			const manager = new McpManager(
 				ctx.cwd,
 				getAgentDir(),

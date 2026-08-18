@@ -12,6 +12,7 @@
 - [x] 单元测试覆盖 MCP 全局/项目配置覆盖、项目信任、直接工具注册、动态目录、调用参数、取消透传与连接清理。
 - [x] 单元测试覆盖 stdio server `stderr` 隔离与有界诊断，避免子进程日志污染 Pi TUI。
 - [x] 单元测试覆盖 MCP 多 block 总预算、超长单行 UTF-8 截断、完整文本落盘和 collapsed/expanded renderer。
+- [x] 单元测试覆盖 session resume 的 MCP 历史 renderer placeholder 保持非激活并默认折叠。
 - [x] 使用官方 SDK 实际连接 Exa Streamable HTTP（发现 2 个 tools）与 `@modelcontextprotocol/server-everything` stdio（发现 13 个 tools）。
 
 ## 延期验收

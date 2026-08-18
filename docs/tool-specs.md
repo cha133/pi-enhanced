@@ -218,6 +218,7 @@ schema：
 - image blocks 不计入文本额度并原样保留。
 - details 只保留 server、tool 和可选 truncation 统计/完整文本路径，不保留完整 structuredContent 副本。
 - TUI 外层工具框标题已经显示稳定的 `mcp_<server>_<tool>` 名称，结果区不再重复显示另一种 `MCP server/tool` 身份行；collapsed 状态直接显示最多 3 行且约 800 个源字符的结果以及 `Ctrl+O` 提示，expanded 状态显示经过上述硬上限保护后的全部结果。
+- session resume 时，在后台重新发现 MCP tools 之前，扩展根据当前 transcript 中的 `mcp_` 历史 tool result 名称同步注册非激活 renderer placeholder（包括不带 details 的历史错误）；因此 `pi -c` 初次绘制仍使用上述 collapsed 视图，不回退到无界的未知工具显示。已由其他扩展注册的同名 definition 不覆盖，真实目录就绪后同名 placeholder 由正式 definition 覆盖并正常激活。
 
 ### 动态目录
 

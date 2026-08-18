@@ -12,6 +12,8 @@ pi-enhanced/
 │       ├── activation.ts
 │       ├── pwsh.ts
 │       ├── edit.ts
+│       ├── mcp.ts
+│       ├── mcp-rendering.ts
 │       ├── read.ts
 │       ├── write.ts
 │       ├── session-info.ts
@@ -103,6 +105,7 @@ flowchart TD
 
 - manager 由当前 session 独占，配置在 session 启动时读取一次；全局与可信项目配置按 server 名覆盖合并。
 - 各 server 并行连接，因此快 server 不等待慢 server。目录按照 server 名和原始 tool 名排序，减少无意义的工具顺序变化。
+- session resume 的历史消息可能早于后台 MCP discovery 绘制；入口会从当前 compaction-aware transcript 中识别 `mcp_` tool result 名称，同步注册仅提供 renderer、且不加入 active set 的轻量 placeholder；已注册的同名 definition 保持不变。manager 计算名称冲突时排除本次新增的 placeholder，真实 tool discovery 后以同名 definition 覆盖，既保持恢复首帧折叠，也不阻塞启动。
 - stdio transport 显式将 server `stderr` 设为 pipe 并持续排空，避免子进程日志绕过全屏 TUI renderer 污染输入区；只保留最近 8,192 个字符供连接失败诊断，正常运行不展示 server 日志。
 - MCP 原始 JSON Schema 直接交给 pi；pi 对 raw JSON Schema 做参数校验并在 provider adapter 层处理兼容，不在本扩展构造另一套通用 schema 转换器。
 - 工具不提供 `promptSnippet` / `promptGuidelines`，信息只放在 tool name、label、description 与 parameters 中，避免重复修改 system prompt。
