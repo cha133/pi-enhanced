@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { StringDecoder } from "node:string_decoder";
 import {
 	Client,
 	StreamableHTTPClientTransport,
@@ -90,6 +91,7 @@ type PiContent = { type: "text"; text: string } | { type: "image"; data: string;
 
 const MCP_COLLAPSED_MAX_LINES = 3;
 const MCP_COLLAPSED_MAX_CHARS = 800;
+const MCP_STDERR_MAX_CHARS = 8_192;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -186,6 +188,29 @@ function inheritedEnvironment(): Record<string, string> {
 	return Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined));
 }
 
+export function createStdioMcpTransport(config: StdioMcpServerConfig, cwd: string): {
+	transport: StdioClientTransport;
+	readStderr: () => string;
+} {
+	const transport = new StdioClientTransport({
+		command: config.command,
+		args: config.args ?? [],
+		env: { ...inheritedEnvironment(), ...(config.env ?? {}) },
+		cwd,
+		stderr: "pipe",
+	});
+	const decoder = new StringDecoder("utf8");
+	let stderr = "";
+	const append = (text: string) => {
+		stderr = `${stderr}${text}`.slice(-MCP_STDERR_MAX_CHARS);
+	};
+	transport.stderr?.on("data", (chunk: Buffer | string) => {
+		append(typeof chunk === "string" ? chunk : decoder.write(chunk));
+	});
+	transport.stderr?.on("end", () => append(decoder.end()));
+	return { transport, readStderr: () => stderr.trim() };
+}
+
 async function connectMcpServer(
 	_serverName: string,
 	config: McpServerConfig,
@@ -205,18 +230,19 @@ async function connectMcpServer(
 			},
 		},
 	);
+	const stdio = "command" in config ? createStdioMcpTransport(config, cwd) : undefined;
 	const transport = "url" in config
 		? new StreamableHTTPClientTransport(new URL(config.url))
-		: new StdioClientTransport({
-				command: config.command,
-				args: config.args ?? [],
-				env: { ...inheritedEnvironment(), ...(config.env ?? {}) },
-				cwd,
-			});
+		: stdio!.transport;
 	try {
 		await client.connect(transport, { signal });
 	} catch (error: unknown) {
 		await client.close().catch(() => undefined);
+		const stderr = stdio?.readStderr();
+		if (stderr && (!(error instanceof DOMException) || error.name !== "AbortError")) {
+			const message = error instanceof Error ? error.message : String(error);
+			throw new Error(`${message}\nMCP server stderr (tail):\n${stderr}`, { cause: error });
+		}
 		throw error;
 	}
 	return {

@@ -10,6 +10,7 @@
 - [x] 在纯文本主模型与已配置 vision 模型上验收 fallback、usage 与取消。
 - [x] 在已认证的真实当前模型上验收首条消息异步命名、手工改名竞争与 fork 尾缀。
 - [x] 单元测试覆盖 MCP 全局/项目配置覆盖、项目信任、直接工具注册、动态目录、调用参数、取消透传与连接清理。
+- [x] 单元测试覆盖 stdio server `stderr` 隔离与有界诊断，避免子进程日志污染 Pi TUI。
 - [x] 单元测试覆盖 MCP 多 block 总预算、超长单行 UTF-8 截断、完整文本落盘和 collapsed/expanded renderer。
 - [x] 使用官方 SDK 实际连接 Exa Streamable HTTP（发现 2 个 tools）与 `@modelcontextprotocol/server-everything` stdio（发现 13 个 tools）。
 

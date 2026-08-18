@@ -222,5 +222,6 @@ schema：
 ### 动态目录
 
 - session 启动后后台连接，不阻塞用户首条消息。
+- stdio server 的 `stderr` 由扩展管道化并持续消费，不直接继承写入 Pi 的全屏 TUI；正常诊断保持静默，连接失败时仅把有界的末尾诊断附加到错误通知。
 - server 初次 `tools/list` 完成后注册并激活工具；尚未完成的 server 从后续模型请求开始可用。
 - `tools/list_changed` 重新同步该 server 的完整目录；新增项激活，删除项停用，相同目录不会改变工具命名。

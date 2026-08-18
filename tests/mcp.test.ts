@@ -2,8 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import type { PassThrough } from "node:stream";
 import type { Tool as McpSdkTool } from "@modelcontextprotocol/client";
 import {
+	createStdioMcpTransport,
 	guardMcpOutput,
 	loadMcpConfig,
 	McpManager,
@@ -73,6 +75,18 @@ describe("MCP configuration", () => {
 });
 
 describe("MCP manager", () => {
+	test("pipes and bounds stdio server diagnostics instead of inheriting them into the TUI", () => {
+		const { transport, readStderr } = createStdioMcpTransport({ command: "unused" }, process.cwd());
+		const stderr = transport.stderr as PassThrough | null;
+		expect(stderr).not.toBeNull();
+
+		stderr!.write(Buffer.from(`discarded-${"x".repeat(10_000)}-tail`));
+		expect(readStderr()).not.toContain("discarded-");
+		expect(readStderr()).toEndWith("-tail");
+		expect(readStderr().length).toBeLessThanOrEqual(8_192);
+		stderr!.end();
+	});
+
 	test("registers direct tools, forwards calls and cancellation, and refreshes the active surface", async () => {
 		const root = await mkdtemp(join(tmpdir(), "pi-enhanced-mcp-manager-"));
 		const agentDir = join(root, "agent");
