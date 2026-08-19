@@ -296,4 +296,37 @@ describe("MCP result rendering", () => {
 		expect(expanded.length).toBeGreaterThan(collapsed.length);
 		expect(expanded.join("\n")).not.toContain("Ctrl+O to expand");
 	});
+
+	test("collapses pretty-printed JSON as compact single-line JSON", () => {
+		const payload = {
+			result: { result: "animation mode stopped, weights reset", details: "x".repeat(400) },
+		};
+		const pretty = JSON.stringify(payload, null, 2);
+		const collapsed = new McpResultView(pretty, false).render(80);
+
+		expect(collapsed).toHaveLength(4);
+		expect(collapsed[0].trimEnd()).toStartWith('{"result":{"result":"animation mode stopped, weights');
+		expect(collapsed.at(-1)).toContain("Ctrl+O to expand");
+		expect(collapsed.join("\n")).not.toContain("\n\n");
+	});
+
+	test("keeps original formatting in the expanded view", () => {
+		const pretty = JSON.stringify({ result: { ok: true } }, null, 2);
+		const expanded = new McpResultView(pretty, true).render(80);
+
+		expect(expanded.map((line) => line.trimEnd()).join("\n")).toBe(pretty);
+	});
+
+	test("leaves non-JSON and already compact text untouched in the collapsed view", () => {
+		const invalid = "{ not json\nsecond line";
+		const collapsedInvalid = new McpResultView(invalid, false).render(80);
+		expect(collapsedInvalid[0].trimEnd()).toBe("{ not json");
+		expect(collapsedInvalid[1].trimEnd()).toBe("second line");
+		expect(collapsedInvalid.some((line) => line.includes("Ctrl+O"))).toBe(false);
+
+		const compact = JSON.stringify({ result: { ok: true } });
+		const collapsedCompact = new McpResultView(compact, false).render(80);
+		expect(collapsedCompact[0].trimEnd()).toBe(compact);
+		expect(collapsedCompact.some((line) => line.includes("Ctrl+O"))).toBe(false);
+	});
 });

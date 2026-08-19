@@ -16,8 +16,20 @@ function resultDisplayText(content: PiContent[]): string {
 	return lines.length > 0 ? lines.join("\n") : "(empty result)";
 }
 
+function compactJsonForCollapsed(text: string): string {
+	const trimmed = text.trim();
+	if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return text;
+	try {
+		const compact = JSON.stringify(JSON.parse(trimmed));
+		return compact.length < trimmed.length ? compact : text;
+	} catch {
+		return text;
+	}
+}
+
 export class McpResultView implements Component {
 	private readonly fullText: Text;
+	private readonly collapsedSource: string;
 
 	constructor(
 		private readonly text: string,
@@ -26,14 +38,15 @@ export class McpResultView implements Component {
 		private readonly mutedStyle: (text: string) => string = (value) => value,
 	) {
 		this.fullText = new Text(this.outputStyle(text), 0, 0);
+		this.collapsedSource = compactJsonForCollapsed(text);
 	}
 
 	render(width: number): string[] {
 		if (this.expanded) return this.fullText.render(width);
 
-		const prefix = this.text.slice(0, MCP_COLLAPSED_MAX_CHARS);
+		const prefix = this.collapsedSource.slice(0, MCP_COLLAPSED_MAX_CHARS);
 		const rendered = new Text(this.outputStyle(prefix), 0, 0).render(width);
-		const clipped = prefix.length < this.text.length || rendered.length > MCP_COLLAPSED_MAX_LINES;
+		const clipped = prefix.length < this.collapsedSource.length || rendered.length > MCP_COLLAPSED_MAX_LINES;
 		return clipped
 			? [
 					...rendered.slice(0, MCP_COLLAPSED_MAX_LINES),
