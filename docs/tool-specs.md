@@ -4,7 +4,7 @@
 
 ### 临时兼容覆盖
 
-- 保持 pi 0.83.0 原生 `write` 的输入 schema、路径解析、mutation queue、取消检查、UTF-8 完整写入、返回文本和 TUI renderer。
+- 保持 pi 0.85.1 原生 `write` 的输入 schema、路径解析、mutation queue、取消检查、UTF-8 完整写入、返回文本和 TUI renderer；成功提示为 `Successfully wrote to <path>`，不报告字节数。
 - 只替换本地 `mkdir` / `writeFile` operations；父目录仍使用 recursive mkdir 创建。
 - 若 recursive mkdir 抛出 `EEXIST`，必须再以 `stat` 确认该路径确实是目录才继续写入。路径是文件、无法确认或任何其他错误均原样失败。
 
@@ -64,7 +64,7 @@
 
 ### 输入
 
-沿用 pi 0.83.0 的批量 schema：
+沿用 pi 0.85.1 的批量 schema：
 
 ```ts
 {
@@ -158,7 +158,7 @@ schema：
 }
 ```
 
-- `path`、`offset`、`limit` 完全沿用 pi 0.83.0 原生 `read` schema 与语义。
+- `path`、`offset`、`limit` 完全沿用 pi 0.85.1 原生 `read` schema 与语义。
 - `image.query` 缺省为准确描述图片；用户有具体问题时模型应原样传达重点。
 - `image.detail` 控制 fallback system prompt 的深度，也可作为给原生模型的文字提示。
 - 文本结果保持原生内容、分页提示、50 KB / 2,000 行截断、错误和 renderer；不增加 hashline 标签、行锚点或 session grounding。

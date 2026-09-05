@@ -52,7 +52,7 @@ describe("enhanced write", () => {
 			expect(await readFile(join(cwd, "nested", "sample.txt"), "utf8")).toBe("hello\n");
 			expect(result.content).toEqual([{
 				type: "text",
-				text: "Successfully wrote 6 bytes to nested/sample.txt",
+				text: "Successfully wrote to nested/sample.txt",
 			}]);
 		} finally {
 			await rm(cwd, { recursive: true, force: true });

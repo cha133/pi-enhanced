@@ -77,7 +77,7 @@
 | D-009 | 所有平台禁用 `read`；fallback 环境静默保留并增强原生 `bash` 的 prompt metadata（已由 D-031 取代） | 用户确认 |
 | D-010 | `view_image` 使用 path/query/detail；多模态原生消费，纯文本走明确标识的外挂 vision，prompt metadata 随模型能力变化（已由 D-031 取代） | 用户确认 |
 | D-011 | vision fallback 失败返回普通结果，不抛工具错误 | 用户确认 |
-| D-013 | 包名 `pi-enhanced`、MIT、GitHub 直接安装；首个完成版本为 0.1.0；最低 pi 0.83.0 | 用户确认 |
+| D-013 | 包名 `pi-enhanced`、MIT、GitHub 直接安装；首个完成版本为 0.1.0；最低 pi 0.85.1（2026-09-05 从 0.83.0 升级） | 用户确认；用户要求跟进最新 pi |
 | D-014 | edit 重叠组全部拒绝，其他正确项合并成一次原子写盘 | 用户确认 |
 | D-015 | edit rejected 仅回传索引、错误信息和明确标注为不完整的有界预览 | 用户确认 |
 | D-016 | vision fallback 使用紧凑单行实时状态 | 用户确认 |

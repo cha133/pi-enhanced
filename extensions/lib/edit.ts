@@ -284,11 +284,11 @@ export function createEnhancedEditTool(cwd: string): ReturnType<typeof createEdi
 			"Do not submit overlapping or nested entries. If some entries are rejected, retry only those indexes after inspecting the returned errors and applied diff.",
 			"Keep oldText small but unique; do not pad it with large unchanged regions.",
 		],
-		async execute(_toolCallId, input: EditToolInput, signal?: AbortSignal) {
+		async execute(_toolCallId, input: EditToolInput, signal, _onUpdate, ctx) {
 			if (!Array.isArray(input.edits) || input.edits.length === 0) {
 				throw new Error("Edit tool input is invalid. edits must contain at least one replacement.");
 			}
-			const absolutePath = resolvePath(input.path, cwd);
+			const absolutePath = resolvePath(input.path, ctx?.cwd || cwd);
 			return withFileMutationQueue(absolutePath, async () => {
 				const throwIfAborted = () => {
 					if (signal?.aborted) throw new Error("Operation aborted");

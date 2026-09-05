@@ -13,6 +13,26 @@ beforeAll(() => {
 const quietTui = { requestRender() {} } as TUI;
 
 describe("partial edit", () => {
+	test("resolves relative paths against the execution context cwd", async () => {
+		const cwd = await mkdtemp(join(tmpdir(), "pi-enhanced-edit-context-"));
+		const otherCwd = await mkdtemp(join(tmpdir(), "pi-enhanced-edit-factory-"));
+		try {
+			await writeFile(join(cwd, "sample.txt"), "alpha\nbeta\n");
+			await writeFile(join(otherCwd, "sample.txt"), "alpha\nbeta\n");
+			const tool = createEnhancedEditTool(otherCwd);
+			const result = await tool.execute("call", {
+				path: "sample.txt",
+				edits: [{ oldText: "alpha", newText: "ALPHA" }, { oldText: "missing", newText: "x" }],
+			}, undefined, undefined, { cwd } as any);
+			expect(await readFile(join(cwd, "sample.txt"), "utf8")).toBe("ALPHA\nbeta\n");
+			expect(await readFile(join(otherCwd, "sample.txt"), "utf8")).toBe("alpha\nbeta\n");
+			expect(result.details).toMatchObject({ applied: [{ index: 0 }], rejected: [{ index: 1, code: "not_found" }] });
+		} finally {
+			await rm(cwd, { recursive: true, force: true });
+			await rm(otherCwd, { recursive: true, force: true });
+		}
+	});
+
 	test("applies valid entries while returning an independent not-found error", () => {
 		const result = applyPartialEdits("alpha\nbeta\ngamma\n", [
 			{ oldText: "alpha", newText: "ALPHA" },
