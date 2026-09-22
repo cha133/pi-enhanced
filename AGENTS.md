@@ -2,7 +2,7 @@
 
 ## Project overview
 
-`pi-enhanced` is a TypeScript pi package with one public extension entry point. It replaces or augments pi's shell, file, image, and MCP tools while preserving a minimal active tool surface. The supported pi baseline is `0.85.1`.
+`pi-enhanced` is a TypeScript pi package with one public extension entry point. It replaces or augments pi's shell, file, image, and MCP tools while preserving a minimal active tool surface. The supported pi baseline is `0.87.0`.
 
 Read `docs/README.md` first, then open only the design document relevant to the task. Treat `docs/tool-specs.md` as the behavioral contract and `docs/configuration-and-decisions.md` as the record of accepted product decisions.
 

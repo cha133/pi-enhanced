@@ -2,7 +2,13 @@
 
 版本：`0.1.0`
 
-最后更新：2026-09-05
+最后更新：2026-09-22
+
+## pi 0.87.0 升级
+
+- 四个 pi 开发依赖锁定 `0.87.0`，peer dependencies 最低版本同步提升。
+- 对照本地 `../pi` 的 `0.87.0` package manifests 与 changelog 检查升级范围；重点回归 0.86.0/0.87.0 的工具 details JSON 类型约束、扩展 lifecycle 边界及按模型图片输入限制。
+- 自动验证通过：`npm run typecheck`、`npm test`（58 项）、`npm pack --dry-run`。真实模型与交互 TUI 验收沿用下方既有状态，尚未针对 `0.87.0` 重跑。
 
 ## pi 0.85.1 升级
 
