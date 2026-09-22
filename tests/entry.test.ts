@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import piEnhanced from "../extensions/pi-enhanced.js";
@@ -7,6 +7,9 @@ import piEnhanced from "../extensions/pi-enhanced.js";
 describe("single extension entry", () => {
 	test("registers the enhanced surface and overrides read and write on session start", async () => {
 		const cwd = await mkdtemp(join(tmpdir(), "pi-enhanced-entry-"));
+		const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
+		process.env.PI_CODING_AGENT_DIR = cwd;
+		await writeFile(join(cwd, "mcp.json"), JSON.stringify({ mcpServers: {} }));
 		const handlers = new Map<string, Array<(...args: any[]) => unknown>>();
 		const tools = new Map<string, unknown>();
 		const entries: unknown[] = [{
@@ -22,6 +25,7 @@ describe("single extension entry", () => {
 			on(name: string, handler: (...args: any[]) => unknown) {
 				handlers.set(name, [...(handlers.get(name) ?? []), handler]);
 			},
+			registerCommand() {},
 			registerTool(tool: { name: string }) {
 				tools.set(tool.name, tool);
 			},
@@ -60,6 +64,7 @@ describe("single extension entry", () => {
 			expect(active).toContain("write");
 			expect(active).not.toContain("view_image");
 			expect(active).toContain("third_party");
+			expect(active.filter((name) => name.startsWith("mcp_"))).toEqual(["mcp_search", "mcp_call"]);
 			expect((tools.get("read") as { description: string }).description).toContain("external vision model");
 			const historicalMcp = tools.get("mcp_unity_get_editor_state") as any;
 			expect(historicalMcp).toBeDefined();
@@ -83,6 +88,8 @@ describe("single extension entry", () => {
 			expect((tools.get("read") as { description: string }).description).toContain("direct inspection");
 		} finally {
 			for (const handler of handlers.get("session_shutdown") ?? []) await handler({}, ctx);
+			if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+			else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
 			await rm(cwd, { recursive: true, force: true });
 		}
 	});

@@ -58,6 +58,19 @@ export class McpResultView implements Component {
 	invalidate(): void {}
 }
 
+export const renderMcpCall: NonNullable<PiToolDefinition["renderCall"]> = (args, theme) => {
+	// Streaming arguments may be incomplete; keep the target visible as it arrives.
+	const input = isRecord(args) ? args : {};
+	const displayName = (value: unknown) => typeof value === "string" && value.length > 0
+		? value.replace(/[\x00-\x1f\x7f-\x9f]/g, " ")
+		: "…";
+	return new Text(
+		theme.fg("toolTitle", theme.bold("mcp_call")) + " "
+			+ theme.fg("accent", `${displayName(input.server)} / ${displayName(input.tool)}`),
+		0, 0,
+	);
+};
+
 export const renderMcpResult: NonNullable<PiToolDefinition["renderResult"]> = (result, options, theme) => {
 	if (options.isPartial) return new Text(theme.fg("warning", "Running…"), 0, 0);
 	return new McpResultView(

@@ -39,7 +39,8 @@
 {
   "mcpServers": {
     "exa": {
-      "url": "https://mcp.exa.ai/mcp"
+      "url": "https://mcp.exa.ai/mcp",
+      "hint": "Search the web and retrieve webpage content."
     },
     "blender": {
       "command": "uvx",
@@ -53,6 +54,7 @@
 - 先读全局、再读项目；项目同名 server 完整替换全局项，不做字段深合并。
 - `url` 与 `command` 必须且只能出现一个。`url` 只支持绝对 HTTP(S) Streamable HTTP endpoint。
 - stdio 的 `args` 缺省为 `[]`；`env` 值必须都是字符串，并覆盖继承的 `process.env` 同名值；进程 cwd 固定为当前 Pi session cwd。
+- `hint` 是可选字符串，空白视为缺失，允许手写或通过 `/mcp-gen-hints [server]` 补齐；仅用于客户端静态目录，不传给服务器。命令写回原来源文件，新 hint 下次 session 初始化生效。
 - 初版严格拒绝未支持字段；不支持 legacy SSE、headers、OAuth、`cwd` 与配置内环境变量插值。
 - 文件不存在是正常状态。单个文件、server 配置或连接失败会报告路径/server，但不阻止其他合法 server。
 - 配置每个 session 只读一次；修改后新开 session 生效。MCP server 自己发出的 `tools/list_changed` 仍动态生效。
@@ -90,15 +92,18 @@
 | D-023 | fork 不请求模型；继承标题追加或递增末尾 ` (n)`，未命名 fork 保持 pi 默认名称 | 用户确认 |
 | D-024 | 标题模型请求不设置输出 token 上限；对强制推理模型只用提示词与结果清洗限制最终标题长度，避免 thinking 在标题文本前耗尽请求额度 | 用户确认 |
 | D-025 | MCP 初版只支持 Streamable HTTP 与 stdio，配置路径固定为全局 `~/.pi/agent/mcp.json` 和可信项目 `<cwd>/.mcp.json` | 用户确认 |
-| D-026 | MCP tools 直接作为普通模型工具暴露，不增加代理式 `mcp` list/search 步骤 | 用户确认 |
-| D-027 | MCP discovery 在 session 启动时后台执行，不阻塞首条用户请求；目录完成或变化后动态刷新工具面 | 用户确认 |
-| D-029 | MCP 使用官方 TypeScript SDK，原始 inputSchema 交给 Pi 的 raw JSON Schema/provider 兼容路径，只在证据表明需要时增加定向转换 | 对齐结论 |
+| D-026 | MCP tools 直接作为普通模型工具暴露（已由 D-037 取代） | 用户确认 |
+| D-027 | MCP discovery 在 session 启动时后台执行；动态直接工具面已由 D-037 取代 | 用户确认 |
+| D-029 | MCP 使用官方 TypeScript SDK，原始 inputSchema 保留于内部目录，call 前复用 Pi 的 raw JSON Schema 验证路径；不自行转换 schema | 对齐结论 |
 | D-030 | MCP 模型侧文本统一限制为 50 KB / 2,000 行并把完整超限文本写入临时文件；TUI 独立折叠为 3 行/约 800 字符，展开不绕过模型侧硬上限 | 用户确认 |
 | D-031 | 不再指导模型通过 shell 读取文件；以同名增强 `read` 覆盖原生工具，完整保留原生文本/图片行为，仅为纯文本模型增加 `image.query/detail` vision fallback；删除 `view_image`，且不引入 hashline | 用户确认 |
 | D-032 | 标题 prompt 要求中文与英文单词之间保留一个空格；暂不增加确定性后处理，依赖当前模型遵循排版要求 | 用户确认 |
 | D-033 | 临时同名覆盖 `write`，保留原生 contract，仅修复 Bun/Windows 对带只读属性现有父目录错误抛出 `EEXIST`；官方 pi 或 Bun 修复后删除该覆盖 | 用户确认 |
 | D-035 | MCP client 在 `session_start` 后异步导入，避免 SDK 解析阻塞扩展加载；`PI_TIMING=1` 时额外记录 MCP 模块导入耗时 | 冷启动性能诊断 |
 | D-036 | 移除低频且无法由用户即时干预的子代理工具、顾问模型配置和全部子会话适配层 | 用户需求 |
+| D-037 | MCP 固定暴露 `mcp_search` / `mcp_call`，工具 schema 按需返回；轻量加权关键词搜索加完整可遍历目录兜底，无动态直接工具注册 | 用户确认 |
+| D-038 | MCP 目录只读取静态配置名称与可选 `hint`，启动时固定排序；不读取服务器简介、不自动生成、不维护独立缓存，连接状态不改变 prompt | 用户确认 |
+| D-039 | `/mcp-gen-hints [server]` 逐个用当前模型补齐缺失 hint，显示可取消进度，按配置来源写回并保留手工修改；新 hint 下次 session 初始化生效；简介不设字符硬上限或额外输出 token 上限，仅提取 text，不保存 thinking | 用户确认 |
 
 ## 待确认决策
 

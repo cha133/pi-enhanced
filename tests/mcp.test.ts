@@ -12,7 +12,7 @@ import {
 	McpResultView,
 	type McpServerConfig,
 } from "../extensions/lib/mcp.js";
-import { bindMcpTools } from "../extensions/lib/mcp-binding.js";
+import { createMcpTools, searchMcp } from "../extensions/lib/mcp-tools.js";
 
 const firstTool: McpSdkTool = {
 	name: "web.search",
@@ -87,7 +87,7 @@ describe("MCP manager", () => {
 		stderr!.end();
 	});
 
-	test("registers direct tools, forwards calls and cancellation, and refreshes the active surface", async () => {
+	test("exposes only two fixed tools, validates and forwards calls, and refreshes the internal catalog", async () => {
 		const root = await mkdtemp(join(tmpdir(), "pi-enhanced-mcp-manager-"));
 		const agentDir = join(root, "agent");
 		const cwd = join(root, "project");
@@ -104,7 +104,6 @@ describe("MCP manager", () => {
 			agentDir,
 			true,
 			(message) => { throw new Error(message); },
-			["read", "bash"],
 			async (_server, config, onToolsChanged) => {
 				configs.push(config);
 				changed = onToolsChanged;
@@ -130,44 +129,33 @@ describe("MCP manager", () => {
 			},
 		);
 
-		const registered = new Map<string, any>();
-		let active = ["bash", "write"];
-		let activeUpdates = 0;
-		const pi = {
-			registerTool(tool: { name: string }) { registered.set(tool.name, tool); },
-			getActiveTools: () => active,
-			setActiveTools(names: string[]) {
-				active = names;
-				activeUpdates += 1;
-			},
-		} as any;
-		const unbind = bindMcpTools(pi, manager);
+		const loaded = await loadMcpConfig(cwd, agentDir, true);
+		const registered = new Map(createMcpTools(loaded, async () => manager).map((tool) => [tool.name, tool]));
 
 		try {
 			await manager.start();
 			expect(configs).toEqual([{ url: "https://mcp.example/mcp" }]);
-			expect([...registered.keys()]).toEqual(["mcp_exa_web_search"]);
-			expect(active).toContain("mcp_exa_web_search");
+			expect([...registered.keys()]).toEqual(["mcp_search", "mcp_call"]);
 
 			const signal = new AbortController().signal;
-			const result = await registered.get("mcp_exa_web_search").execute(
+			const result = await registered.get("mcp_call")!.execute(
 				"call-1",
-				{ query: "pi" },
+				{ server: "exa", tool: "web.search", arguments: { query: "pi" } },
 				signal,
 				undefined,
-				{},
+				{} as any,
 			);
 			expect(receivedArguments).toEqual({ query: "pi" });
 			expect(receivedSignal).toBe(signal);
 			expect(result.content).toEqual([{ type: "text", text: "found it" }]);
 			expect(result.details).toEqual({ server: "exa", tool: "web.search" });
 
-			const structured = await registered.get("mcp_exa_web_search").execute(
+			const structured = await registered.get("mcp_call")!.execute(
 				"call-2",
-				{ query: "structured" },
+				{ server: "exa", tool: "web.search", arguments: { query: "structured" } },
 				undefined,
 				undefined,
-				{},
+				{} as any,
 			);
 			expect(structured.content).toEqual([
 				{ type: "text", text: "{\n  \"hits\": 2\n}" },
@@ -175,15 +163,14 @@ describe("MCP manager", () => {
 			]);
 			expect(structured.details).toEqual({ server: "exa", tool: "web.search" });
 
-			const updatesBeforeNoop = activeUpdates;
-			changed?.([{ ...firstTool }]);
-			expect(activeUpdates).toBe(updatesBeforeNoop);
-
+			await expect(manager.call("exa", "web.search", {})).rejects.toThrow("query");
+			const description = registered.get("mcp_search")!.description;
 			changed?.([{ ...firstTool, name: "answer" }]);
-			expect(active).not.toContain("mcp_exa_web_search");
-			expect(active).toContain("mcp_exa_answer");
+			expect(registered.get("mcp_search")!.description).toBe(description);
+			await expect(manager.call("exa", "web.search", { query: "pi" })).rejects.toThrow("Unknown MCP tool");
+			expect(await searchMcp(loaded, manager, { server: "exa" })).toMatchObject({ tools: [{ server: "exa", name: "answer", description: "Search the web" }] });
+
 		} finally {
-			unbind();
 			await manager.close();
 			await rm(root, { recursive: true, force: true });
 		}
@@ -205,7 +192,6 @@ describe("MCP manager", () => {
 			agentDir,
 			true,
 			() => {},
-			[],
 			async (_server, _config, _changed, signal) => {
 				connectorStarted();
 				await new Promise<void>((_resolve, reject) => {

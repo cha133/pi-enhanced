@@ -2,7 +2,7 @@
 
 ## 定位
 
-`pi-enhanced` 是一个面向日常编码的单入口 pi 扩展包。它不追求尽可能多的 agent tools，而是在 pi 原生四工具表面上做少量、高收益、可解释的增强，并把用户克制配置的 MCP 工具直接暴露给模型。
+`pi-enhanced` 是一个面向日常编码的单入口 pi 扩展包。它不追求尽可能多的 agent tools，而是在 pi 原生四工具表面上做少量、高收益、可解释的增强，并通过固定的搜索与调用工具按需发现 MCP 能力。
 
 设计取向：
 
@@ -19,11 +19,11 @@
 
 ### 目标有效工具矩阵
 
-| 环境 | 原生 `bash` | 增强 `read` | 增强 `write` | 原生 `edit` | `pwsh` | 增强 `edit` | 已配置 MCP tools |
+| 环境 | 原生 `bash` | 增强 `read` | 增强 `write` | 原生 `edit` | `pwsh` | 增强 `edit` | `mcp_search` / `mcp_call` |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Windows + pwsh 7 | 禁用 | 启用 | 启用 | 被覆盖 | 启用 | 启用 | 后台发现后启用 |
-| Windows，无 pwsh 7 | 提示词被覆盖 | 启用 | 启用 | 被覆盖 | 不注册/不启用 | 启用 | 后台发现后启用 |
-| 非 Windows | 提示词被覆盖 | 启用 | 启用 | 被覆盖 | 不注册/不启用 | 启用 | 后台发现后启用 |
+| Windows + pwsh 7 | 禁用 | 启用 | 启用 | 被覆盖 | 启用 | 启用 | 启动时启用 |
+| Windows，无 pwsh 7 | 提示词被覆盖 | 启用 | 启用 | 被覆盖 | 不注册/不启用 | 启用 | 启动时启用 |
+| 非 Windows | 提示词被覆盖 | 启用 | 启用 | 被覆盖 | 不注册/不启用 | 启用 | 启动时启用 |
 
 说明：
 
@@ -32,7 +32,7 @@
 - fallback 环境保留原生 `bash` 执行实现，但同名 override 只增加通用 shell/ripgrep guidance，不指导模型用 shell 读取文件。
 - `read` 不引入 `pi-extensions` 的 hashline 格式或 session grounding 状态。
 - 自定义工具只应调整自己负责的内置工具名，不得意外移除其他扩展的有效工具。
-- MCP 工具以 `mcp_<server>_<tool>` 稳定命名并直接进入模型 tools 参数，不增加代理式 list/search 调用。
+- MCP 只暴露 `mcp_search` / `mcp_call`；静态名称/hint 目录帮助发现，具体工具 schema 按需读取。`/mcp-gen-hints` 可手动补齐配置中的用途提示。
 
 ## 非目标
 

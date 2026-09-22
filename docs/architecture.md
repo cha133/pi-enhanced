@@ -12,6 +12,9 @@ pi-enhanced/
 │       ├── activation.ts
 │       ├── pwsh.ts
 │       ├── edit.ts
+│       ├── mcp-config.ts
+│       ├── mcp-tools.ts
+│       ├── mcp-hints.ts
 │       ├── mcp.ts
 │       ├── mcp-rendering.ts
 │       ├── read.ts
@@ -44,8 +47,8 @@ flowchart TD
     K["model_select"] --> L["刷新 read 的动态 prompt metadata"]
     B --> M["session info: session_start 恢复；before_agent_start 首次捕获并注入"]
     B --> N["session title: 首条消息异步请求当前模型；完成后持久化名称"]
-    B --> O["MCP manager: 后台读取配置并并行连接 server"]
-    O --> P["tools/list 后动态注册直接工具"]
+    B --> O["MCP: 启动读取静态配置并注册两个固定工具"]
+    O --> P["后台导入 SDK、连接与发现；目录只存内存"]
 ```
 
 关键约束：
@@ -61,7 +64,7 @@ flowchart TD
 - session info 在第一轮 `before_agent_start` 才同时捕获时间与当前模型，并写入 `session-info` custom entry；后续轮次、模型切换和 session resume 始终复用固定 prompt。
 - session title 只处理没有历史用户消息、没有现有名称的新会话。第一轮 `before_agent_start` 立即启动不阻塞主回答的当前模型请求。请求不设置模型输出 token 上限；prompt 要求中文与英文单词混排时保留一个空格，标题长度由 prompt 和返回后的 60 字符清洗共同约束，不对中英文边界做代码改写。完成后通过 `setSessionName()` 持久化，请求失败或纯图片首条消息静默保留 pi 默认名称。
 - fork 不调用标题模型：若继承到名称，则把末尾 ` (n)` 递增，或首次追加 ` (1)`；未命名 fork 保留 pi 默认名称。
-- MCP manager 在 `session_start` 后异步导入 MCP client、读取配置和连接，不等待 `before_agent_start`，因此 SDK 模块解析和 server discovery 都不阻塞扩展加载。每个 server 完成 `tools/list` 后批量刷新工具面；`tools/list_changed` 使用 SDK 的聚合结果继续刷新。`session_shutdown` 失效化或等待尚未完成的导入，并关闭 manager 与 transport。
+- `mcp-config.ts` 不依赖 SDK，在 `session_start` 读取本地配置；`mcp-tools.ts` 同步构造固定 search/call 与静态目录。SDK 仍后台导入并由 `mcp.ts` 管理连接，`tools/list_changed` 只更新内存目录。`mcp-hints.ts` 注册显式生成命令，进度/取消与配置写回独立于目录快照。`session_shutdown` 失效化尚未完成的导入并关闭 manager 与 transport。
 
 ## 复用边界
 
@@ -79,7 +82,7 @@ flowchart TD
 - edit 的逐项分类、冲突消解和结果格式化。
 - vision fallback 的模型选择、stream 状态归约和 UI renderer。
 - vision 顶层配置合并与校验。
-- 两层 MCP 配置读取、严格校验、覆盖合并、工具命名以及 MCP content 到 pi tool result 的适配。
+- 两层 MCP 配置读取、严格校验、覆盖合并、懒加载搜索/调用、hint 生成写回以及 MCP content 到 pi tool result 的适配。
 
 ## 工具激活协调器
 
@@ -103,16 +106,14 @@ flowchart TD
 - session title 请求同时绑定当前 agent signal 与 session-scoped abort controller；session shutdown、reload 或切换时取消，异步结果写入前再次核对 session id 和当前名称，避免覆盖手工 `/name` 或串写新会话。
 ## MCP 生命周期与工具面
 
-- manager 由当前 session 独占，配置在 session 启动时读取一次；全局与可信项目配置按 server 名覆盖合并。
-- 各 server 并行连接，因此快 server 不等待慢 server。目录按照 server 名和原始 tool 名排序，减少无意义的工具顺序变化。
-- session resume 的历史消息可能早于后台 MCP discovery 绘制；入口会从当前 compaction-aware transcript 中识别 `mcp_` tool result 名称，同步注册仅提供 renderer、且不加入 active set 的轻量 placeholder；已注册的同名 definition 保持不变。manager 计算名称冲突时排除本次新增的 placeholder，真实 tool discovery 后以同名 definition 覆盖，既保持恢复首帧折叠，也不阻塞启动。
-- stdio transport 显式将 server `stderr` 设为 pipe 并持续排空，避免子进程日志绕过全屏 TUI renderer 污染输入区；只保留最近 8,192 个字符供连接失败诊断，正常运行不展示 server 日志。
-- MCP 原始 JSON Schema 直接交给 pi；pi 对 raw JSON Schema 做参数校验并在 provider adapter 层处理兼容，不在本扩展构造另一套通用 schema 转换器。
-- 工具不提供 `promptSnippet` / `promptGuidelines`，信息只放在 tool name、label、description 与 parameters 中，避免重复修改 system prompt。
-- 工具删除时从 active set 移除；由于 Pi 没有 unregister API，旧 definition 可留在 registry，但不会再发送给模型。新增或变更工具从下一次模型请求起生效。
-- 调用通过同一 SDK client 路由回原 server，透传 `AbortSignal`。文本与图片原样转成 Pi content；resource 转成有来源标记的文本，audio/binary resource 返回有界的类型说明。
-- 所有 text/resource/structured-only 文本块先合并成一个预算域，再按 Pi 原生上限保留 head：50 KB 或 2,000 行，任一先到即截断。超长单行使用 UTF-8 安全的字节前缀，完整文本以 `0600` 写入系统临时目录；image blocks 不占文本预算并继续传递。
-- TUI renderer 与模型输出保护相互独立：外层工具框标题负责来源标识，结果 renderer 不重复身份行；collapsed 只渲染最多 3 行/约 800 源字符，`Ctrl+O` 展开后显示已经过模型侧保护的完整结果。
+- manager 由当前 session 独占，配置按全局/可信项目 server 名覆盖合并，保留来源路径用于 hint 写回。连接并行且有 30 秒启动期限；调用只等待目标服务器，取消等待不影响共享连接。
+- 模型工具集合固定为 `mcp_search` / `mcp_call`，基于现有 active set 增加，保留其他扩展工具。服务器名称/hint 快照按名称排序并写入 search description，不受连接状态或目录变化影响。
+- `mcp_search` 负责名称/描述/参数名加权匹配、分页浏览和完整定义读取；schema 留在内存直到模型请求，不动态注册搜索结果。
+- `mcp_call` 复用 Pi 的 raw JSON Schema 参数验证，再路由到最新目录对应的 SDK client；保留取消、图片、错误和文本总预算保护。
+- 历史直接工具只注册非激活 renderer placeholder；新的固定工具同样使用折叠 renderer，session resume 仍可显示历史结果。
+- `/mcp-gen-hints` 使用当前模型注册表的独立 complete 请求和可取消 loader，usage 单独记为 custom entry。只给缺失项生成；配置写回使用文件 mutation queue、重新读取与身份/hint 检查、同目录临时文件/rename，不修改内存快照。
+- stdio stderr 管道持续消费，仅错误时展示有界尾部。MCP 文本共享 50 KB / 2,000 行预算，超限完整文本写系统临时文件，图片单独传递。搜索定义按条目分页，单个定义完整保留，不使用会截坏 JSON Schema 的文本裁剪。
+- TUI 折叠最多 3 行/约 800 字符，Ctrl+O 展开保留经过模型侧保护后的原文。
 
 ## 兼容性原则
 

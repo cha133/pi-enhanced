@@ -193,36 +193,70 @@ schema：
 - 缺少/错误 vision 配置、模型不支持图片、认证或 provider 错误：返回 `[Vision fallback failed: ...]` 普通文本结果，让主模型能解释或恢复。
 - fallback 最终没有文本：同上。
 
-## MCP 直接工具
+## MCP 懒加载工具
 
-### 暴露与命名
+### 固定工具面与静态目录
 
-- 每个 `tools/list` 结果直接注册为独立 Pi tool，不提供额外的 `mcp` 代理或 list/search tool。
-- 工具名为 `mcp_<规范化 server 名>_<规范化 tool 名>`，只保留字母、数字、下划线与连字符，最长 64 字符；截断和冲突后缀保持 session 内稳定。
-- tool description 标明来源 server，并保留 MCP tool 自身 description；不额外提供 prompt snippet/guidelines。
-- MCP `inputSchema` 原样作为 Pi tool parameters，由 Pi 的 raw JSON Schema 路径验证。
+- 模型只看到 `mcp_search` 与 `mcp_call`，不再把每个 MCP tool 注册为 Pi tool。
+- `session_start` 等待本地配置读取完成，按 server 名固定排序，将名称与可选 `hint` 放入 `mcp_search` description；无 hint 时只显示名称。不读服务器自带简介，不自动调用模型，不维护独立简介缓存。
+- 目录是当前 session 启动快照。连接顺序、连接成功与否、`tools/list_changed`、手动生成 hint 都不改变当前工具定义或 prompt。新 hint 在下次 session 初始化（包括 `/reload`）时生效。
+- SDK 仍异步导入；server 在后台并行连接，启动读取本地配置后无需等待网络或子进程握手。每个连接与首次目录发现最多等待 30 秒。
+- 固定工具加入现有 active set，保留其他扩展工具。历史 `mcp_<server>_<tool>` 只注册非激活 renderer placeholder，继续支持 resume 时的折叠显示，不重新暴露旧工具。
 
-### 调用与结果
+### `mcp_search`
 
-- 调用使用发现该 tool 的同一 server client，并把 Pi tool 参数作为 MCP `arguments`。
-- 父调用的 `AbortSignal` 传给 SDK `callTool()`；SDK 负责对应 transport 的取消语义。
-- MCP text/image 结果直接映射到 Pi text/image content。
-- embedded text resource 加上 URI 后作为文本返回；resource link 返回名称、描述与 URI；audio 和二进制 resource 初版只返回类型/大小说明，不把不支持的 payload 注入模型。
-- `structuredContent` 在没有原生 text/resource text 时序列化为文本；不把未受限的原始结构重复放入 details。MCP `isError` 转成 Pi tool error，错误文本同样经过输出保护。
+```ts
+{
+  server?: string;
+  query?: string;
+  tool?: string;
+  full?: boolean;
+  limit?: number; // 1–50；关键词搜索默认 5，其余默认 20
+  offset?: number; // 默认 0
+}
+```
 
-### 输出保护与显示
+- 空参数：分页列出配置中的服务器名称、hint 和运行状态（connecting / ready / failed / closed）。
+- `server`：分页浏览该服务器工具名和最多 240 字符的简介，不含 schema。
+- `query`：搜索指定服务器或全部服务器，默认返回匹配项的完整工具定义；`full: false` 可请求轻量结果。
+- `server + tool`：精确读取一个完整定义，必须指定 server；不要求每次 call 前都重复 search。
+- `full: true`：显式请求完整定义，可配合无关键词浏览整个目录。
+- 本地检索按工具名、title、description 和顶层参数名加权；支持大小写归一、下划线/标点与 camelCase 拆词，精确工具名优先，多关键词宽松匹配。无 BM25、向量服务或额外模型请求。跨语言/同义词不保证命中，工具指导优先英文关键词，换词或省略 query 浏览兜底。
+- 返回 `total` 和可选 `nextOffset`。工具页约 24 KB，按完整条目切分；单个超大定义仍完整返回，不裁断 schema。浏览摘要可以缩短描述，完整模式保留 SDK 返回的工具定义。
+- 精确服务器请求等待该服务器完成发现；跨服务器查询并行等待，对失败项返回 `unavailable`，不丢失健康服务器结果。调用者取消只取消当前等待，不关闭共享连接。
 
-- 所有 text blocks 合并后共享 50 KB / 2,000 行总额度，不能让每个 block 分别占满额度。
-- 采用 head 截断；超长单行保留 UTF-8 安全前缀，不返回空预览。
-- 超限时完整合并文本写入系统临时目录的 `pi-mcp-*/output.txt`，文件 mode 为 `0600`；模型结果明确给出原始字节/行数和路径。
-- image blocks 不计入文本额度并原样保留。
-- details 只保留 server、tool 和可选 truncation 统计/完整文本路径，不保留完整 structuredContent 副本。
-- TUI 外层工具框标题已经显示稳定的 `mcp_<server>_<tool>` 名称，结果区不再重复显示另一种 `MCP server/tool` 身份行；collapsed 状态直接显示最多 3 行且约 800 个源字符的结果以及 `Ctrl+O` 提示；若结果文本整体可解析为 JSON 且紧实序列化更短，collapsed 视图先转成单行紧实 JSON 再参与上述行数/字符预算，expanded 状态始终保留原始格式、显示经过上述硬上限保护后的全部结果。
-- session resume 时，在后台重新发现 MCP tools 之前，扩展根据当前 transcript 中的 `mcp_` 历史 tool result 名称同步注册非激活 renderer placeholder（包括不带 details 的历史错误）；因此 `pi -c` 初次绘制仍使用上述 collapsed 视图，不回退到无界的未知工具显示。已由其他扩展注册的同名 definition 不覆盖，真实目录就绪后同名 placeholder 由正式 definition 覆盖并正常激活。
+### `mcp_call`
 
-### 动态目录
+```ts
+{
+  server: string;
+  tool: string; // MCP 原始工具名
+  arguments: Record<string, unknown>;
+}
+```
 
-- session 启动后后台连接，不阻塞用户首条消息。
-- stdio server 的 `stderr` 由扩展管道化并持续消费，不直接继承写入 Pi 的全屏 TUI；正常诊断保持静默，连接失败时仅把有界的末尾诊断附加到错误通知。
-- server 初次 `tools/list` 完成后注册并激活工具；尚未完成的 server 从后续模型请求开始可用。
-- `tools/list_changed` 重新同步该 server 的完整目录；新增项激活，删除项停用，相同目录不会改变工具命名。
+- 从最新内部目录查找工具，以 Pi 的 `validateToolArguments` 验证/规范化原始 JSON Schema 参数，再通过发现工具的同一 SDK client 调用。
+- 未知 server/tool 或错误参数返回明确错误，不发送调用；目录变动后的旧工具名提示重新 search。
+- 父调用 `AbortSignal` 传给 SDK `callTool()`，由 SDK 执行对应 transport 的取消语义。
+- MCP text/image 直接映射为 Pi text/image。embedded text resource 附 URI；resource link 返回名称、描述与 URI；audio/binary resource 只返回类型/大小说明。
+- `structuredContent` 仅在没有原生 text/resource text 时序列化；details 不重复保存完整结构。MCP `isError` 转成 Pi tool error。
+- 所有返回 text blocks 合并共享 50 KB / 2,000 行总预算，超长单行保留 UTF-8 安全前缀。超限完整文本写入系统临时目录 `pi-mcp-*/output.txt`（mode `0600`），结果显示统计和路径；图片不计入文本预算。
+- details 保留 server、tool、可选 truncation 统计和完整文本路径。TUI 折叠最多 3 行/约 800 源字符；JSON 可紧实显示，展开保留原格式且不绕过输出硬上限。自定义调用标题始终显示 `mcp_call <server> / <tool>`，折叠、执行中、成功/错误及历史回放都可辨认目标；参数流尚未到达时以 `…` 占位。
+
+### `/mcp-gen-hints [server]`
+
+- 交互命令只补缺失/空白 hint，默认处理所有生效配置，指定 server 时只处理该项；不覆盖现有手写或生成 hint。删除 hint 后可重新生成。
+- 命令重新读取全局与可信项目配置，使用命令开始时选定的主模型，逐个独立请求；输入只有 server 名和工具名称/title/description，不携带聊天历史、参数 schema 或可调用工具。
+- 连接身份必须与启动快照一致，新增/更换 server 要求先启动新 session。工具元信息仅作为摘要素材，不作为指令。
+- 仅通过提示词要求一句简洁纯文本，不设字符数限制，也不额外设置模型输出 token 上限；只提取 text，忽略 thinking，不截断或拒绝较长简介。空白输出仍失败并明确提示没有文本。单项发现/生成请求最多 120 秒，失败继续其他项；无缺失项不请求模型。
+- CancellableLoader 显示当前序号和服务器，Esc 取消当前工作；完成提示保存、跳过、失败数量与失败原因。每个模型响应的 usage 写入 `mcp-hint-usage` custom entry，独立于主对话 usage。
+- 每项成功后立即写回其来源文件：全局项写全局 `mcp.json`，项目覆盖项写项目 `.mcp.json`。只处理合并后有效项，不修改被覆盖的全局项。
+- 写入使用文件 mutation queue、重新读取与配置身份/hint 检查、同目录临时文件和 rename；保留其他 JSON 字段及缩进。保存前检测到文件变化则失败，已被手工填写的 hint 或替换的配置跳过。
+- 取消/失败保留已完成写入，清理临时文件和进度组件。当前 session 的目录快照保持不变。
+
+### 内部目录与连接
+
+- `tools/list_changed` 只更新内存中的完整目录，不改变 Pi 工具集合。
+- 使用 SDK 的聚合分页发现、协议握手和 transport 生命周期，不自行实现 MCP 协议。
+- stdio `stderr` 由扩展 pipe 并持续消费，正常诊断静默；连接失败只附最近 8,192 字符。
+- session shutdown 取消尚未完成的连接并关闭所有 client/transport。

@@ -1,7 +1,9 @@
 import { getAgentDir, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { activateEnhancedTools } from "./lib/activation.js";
 import { createEnhancedEditTool } from "./lib/edit.js";
-import { bindMcpTools, type McpToolSource } from "./lib/mcp-binding.js";
+import { loadMcpConfig, type LoadedMcpConfig } from "./lib/mcp-config.js";
+import { createMcpTools } from "./lib/mcp-tools.js";
+import { registerMcpHintCommand } from "./lib/mcp-hints.js";
 import { collectHistoricalMcpToolNames, createHistoricalMcpToolDefinition } from "./lib/mcp-rendering.js";
 import type { McpManager } from "./lib/mcp.js";
 import { createEnhancedReadTool } from "./lib/read.js";
@@ -17,10 +19,17 @@ export default function piEnhanced(pi: ExtensionAPI): void {
 	let shell: ShellRegistration | undefined;
 	let enhancedToolNames: string[] = [];
 	let cwd: string | undefined;
-	let mcpManager: (McpManager & McpToolSource) | undefined;
-	let unbindMcp: (() => void) | undefined;
+	let mcpManager: McpManager | undefined;
+	let mcpConfig: LoadedMcpConfig | undefined;
 	let mcpInitialization: Promise<void> | undefined;
 	let mcpLifecycle: object | undefined;
+
+	const getMcpManager = async () => {
+		await mcpInitialization;
+		if (!mcpManager) throw new Error("MCP initialization failed or session closed.");
+		return mcpManager;
+	};
+	registerMcpHintCommand(pi, getMcpManager, () => mcpConfig, getAgentDir());
 
 	const activateSurface = () => {
 		if (!shell) return;
@@ -30,7 +39,12 @@ export default function piEnhanced(pi: ExtensionAPI): void {
 		});
 	};
 
-	pi.on("session_start", (_event, ctx) => {
+	pi.on("session_start", async (_event, ctx) => {
+		mcpLifecycle = undefined;
+		await mcpInitialization;
+		await mcpManager?.close();
+		mcpManager = undefined;
+		mcpConfig = await loadMcpConfig(ctx.cwd, getAgentDir(), ctx.isProjectTrusted());
 		cwd = ctx.cwd;
 		shell = createEnhancedShell(ctx.cwd);
 		const edit = createEnhancedEditTool(ctx.cwd);
@@ -45,12 +59,14 @@ export default function piEnhanced(pi: ExtensionAPI): void {
 
 		const registeredNames = new Set(pi.getAllTools().map((tool) => tool.name));
 		const historicalMcpNames = collectHistoricalMcpToolNames(ctx.sessionManager.buildContextEntries());
-		const placeholderNames = new Set<string>();
+
 		for (const name of historicalMcpNames) {
 			if (registeredNames.has(name)) continue;
 			pi.registerTool(createHistoricalMcpToolDefinition(name));
-			placeholderNames.add(name);
 		}
+
+		for (const tool of createMcpTools(mcpConfig, getMcpManager)) pi.registerTool(tool);
+		pi.setActiveTools([...new Set([...pi.getActiveTools(), "mcp_search", "mcp_call"])]);
 
 		const lifecycle = {};
 		mcpLifecycle = lifecycle;
@@ -66,7 +82,6 @@ export default function piEnhanced(pi: ExtensionAPI): void {
 			}
 			if (mcpLifecycle !== lifecycle) return;
 
-			const reservedNames = pi.getAllTools().map((tool) => tool.name).filter((name) => !placeholderNames.has(name));
 			const manager = new McpManager(
 				ctx.cwd,
 				getAgentDir(),
@@ -75,10 +90,10 @@ export default function piEnhanced(pi: ExtensionAPI): void {
 					if (mcpManager !== manager) return;
 					reportMcpError(message);
 				},
-				reservedNames,
+				undefined,
+				mcpConfig,
 			);
 			mcpManager = manager;
-			unbindMcp = bindMcpTools(pi, manager);
 			void manager.start().catch((error: unknown) => {
 				if (mcpManager === manager) reportMcpError(error instanceof Error ? error.message : String(error));
 			});
@@ -98,8 +113,6 @@ export default function piEnhanced(pi: ExtensionAPI): void {
 		const initialization = mcpInitialization;
 		mcpInitialization = undefined;
 		await initialization;
-		unbindMcp?.();
-		unbindMcp = undefined;
 		const manager = mcpManager;
 		mcpManager = undefined;
 		await manager?.close();
