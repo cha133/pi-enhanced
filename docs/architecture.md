@@ -115,7 +115,7 @@ flowchart TD
 
 ## 兼容性原则
 
-- 当前依赖与最低支持基线为 pi `0.87.0`。原生 read、write、shell wrapper 透传执行上下文；自定义 edit 同样优先使用调用时的 `ctx.cwd`，缺省时回退到构造器目录。
+- 当前依赖与最低支持基线为 pi `0.87.1`。原生 read、write、shell wrapper 透传执行上下文；自定义 edit 同样优先使用调用时的 `ctx.cwd`，缺省时回退到构造器目录。
 - 对 pi 的非公开实现复制必须记录上游文件与基线版本。
 - 对公开构造器的返回 shape 做最小 wrapper，不假定未声明字段永久存在。
 - 升级 pi 时重点回归：工具 details shape、renderer 继承、extension lifecycle、SettingsManager、nested usage 与 model stream event。

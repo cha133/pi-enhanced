@@ -4,6 +4,12 @@
 
 最后更新：2026-09-23
 
+## pi 0.87.1 升级
+
+- 四个 pi 开发依赖锁定 `0.87.1`，peer dependencies 最低版本同步提升。
+- 对照本地 `../pi` 的 package manifests 与 changelog：本版主要更新模型目录、默认 xAI 模型及供应商兼容性；agent-core 与 tui 没有新增行为条目。原生工具契约未变。
+- 自动验证通过：`npm run typecheck`、`npm test`（69 项）、`npm pack --dry-run`。真实模型与交互 TUI 验收尚未针对 `0.87.1` 重跑。
+
 ## pi 0.87.0 升级
 
 - 四个 pi 开发依赖锁定 `0.87.0`，peer dependencies 最低版本同步提升。

@@ -2,7 +2,7 @@
 
 `pi-enhanced` is a single-entry pi package that keeps pi's native tool surface small while improving file reading and writing, batch editing, image inspection, and on-demand MCP tool discovery and calls.
 
-Requires pi `0.87.0` or newer.
+Requires pi `0.87.1` or newer.
 
 ## Tools
 
