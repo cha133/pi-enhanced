@@ -73,6 +73,25 @@ describe("MCP configuration", () => {
 			await rm(root, { recursive: true, force: true });
 		}
 	});
+
+	test("reports obsolete hint fields without hiding other configured servers", async () => {
+		const root = await mkdtemp(join(tmpdir(), "pi-enhanced-mcp-obsolete-"));
+		const agentDir = join(root, "agent");
+		const cwd = join(root, "project");
+		await Promise.all([mkdir(agentDir), mkdir(cwd)]);
+		await Bun.write(join(agentDir, "mcp.json"), JSON.stringify({ mcpServers: {
+			old: { command: "old-server", hint: "Old purpose" },
+			current: { command: "current-server" },
+		} }));
+
+		try {
+			const loaded = await loadMcpConfig(cwd, agentDir, false);
+			expect([...loaded.servers.keys()]).toEqual(["current"]);
+			expect(loaded.issues).toEqual([expect.objectContaining({ server: "old", message: "unsupported field(s): hint" })]);
+		} finally {
+			await rm(root, { recursive: true, force: true });
+		}
+	});
 });
 
 describe("MCP manager", () => {

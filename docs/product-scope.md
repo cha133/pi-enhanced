@@ -32,7 +32,7 @@
 - fallback 环境保留原生 `bash` 执行实现，但同名 override 只增加通用 shell/ripgrep guidance，不指导模型用 shell 读取文件。
 - `read` 不引入 `pi-extensions` 的 hashline 格式或 session grounding 状态。
 - 自定义工具只应调整自己负责的内置工具名，不得意外移除其他扩展的有效工具。
-- MCP 只暴露 `mcp_search` / `mcp_call`；静态名称/hint 目录帮助发现，具体工具 schema 按需读取。`/mcp-gen-hints` 可手动补齐配置中的用途提示。
+- MCP 只暴露 `mcp_search` / `mcp_call`；静态服务器名称目录帮助发现，具体工具 schema 按需读取。项目可通过 `AGENTS.md` 提示模型何时使用特定服务器。
 
 ## 非目标
 

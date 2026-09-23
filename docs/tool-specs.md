@@ -198,8 +198,8 @@ schema：
 ### 固定工具面与静态目录
 
 - 模型只看到 `mcp_search` 与 `mcp_call`，不再把每个 MCP tool 注册为 Pi tool。
-- `session_start` 等待本地配置读取完成，按 server 名固定排序，将名称与可选 `hint` 放入 `mcp_search` description；无 hint 时只显示名称。不读服务器自带简介，不自动调用模型，不维护独立简介缓存。
-- 目录是当前 session 启动快照。连接顺序、连接成功与否、`tools/list_changed`、手动生成 hint 都不改变当前工具定义或 prompt。新 hint 在下次 session 初始化（包括 `/reload`）时生效。
+- `session_start` 等待本地配置读取完成，按 server 名固定排序，将名称放入 `mcp_search` description。不读服务器自带简介，不自动调用模型，不维护独立简介缓存。
+- 目录是当前 session 启动快照。连接顺序、连接成功与否、`tools/list_changed` 都不改变当前工具定义或 prompt。配置变更在下次 session 初始化（包括 `/reload`）时生效。
 - SDK 仍异步导入；server 在后台并行连接，启动读取本地配置后无需等待网络或子进程握手。每个连接与首次目录发现最多等待 30 秒。
 - 固定工具加入现有 active set，保留其他扩展工具。历史 `mcp_<server>_<tool>` 只注册非激活 renderer placeholder，继续支持 resume 时的折叠显示，不重新暴露旧工具。
 
@@ -216,7 +216,7 @@ schema：
 }
 ```
 
-- 空参数：分页列出配置中的服务器名称、hint 和运行状态（connecting / ready / failed / closed）。
+- 空参数：分页列出配置中的服务器名称和运行状态（connecting / ready / failed / closed）。
 - `server`：分页浏览该服务器工具名和最多 240 字符的简介，不含 schema。
 - `query`：搜索指定服务器或全部服务器，默认返回匹配项的完整工具定义；`full: false` 可请求轻量结果。
 - `server + tool`：精确读取一个完整定义，必须指定 server；不要求每次 call 前都重复 search。
@@ -243,17 +243,6 @@ schema：
 - `structuredContent` 仅在没有原生 text/resource text 时序列化；details 不重复保存完整结构。MCP `isError` 转成 Pi tool error。
 - 所有返回 text blocks 合并共享 50 KB / 2,000 行总预算，超长单行保留 UTF-8 安全前缀。超限完整文本写入系统临时目录 `pi-mcp-*/output.txt`（mode `0600`），结果显示统计和路径；图片不计入文本预算。
 - details 保留 server、tool、可选 truncation 统计和完整文本路径。TUI 折叠最多 3 行/约 800 源字符；JSON 可紧实显示，展开保留原格式且不绕过输出硬上限。自定义调用标题始终显示 `mcp_call <server> / <tool>`，折叠、执行中、成功/错误及历史回放都可辨认目标；参数流尚未到达时以 `…` 占位。
-
-### `/mcp-gen-hints [server]`
-
-- 交互命令只补缺失/空白 hint，默认处理所有生效配置，指定 server 时只处理该项；不覆盖现有手写或生成 hint。删除 hint 后可重新生成。
-- 命令重新读取全局与可信项目配置，使用命令开始时选定的主模型，逐个独立请求；输入只有 server 名和工具名称/title/description，不携带聊天历史、参数 schema 或可调用工具。
-- 连接身份必须与启动快照一致，新增/更换 server 要求先启动新 session。工具元信息仅作为摘要素材，不作为指令。
-- 仅通过提示词要求一句简洁纯文本，不设字符数限制，也不额外设置模型输出 token 上限；只提取 text，忽略 thinking，不截断或拒绝较长简介。空白输出仍失败并明确提示没有文本。单项发现/生成请求最多 120 秒，失败继续其他项；无缺失项不请求模型。
-- CancellableLoader 显示当前序号和服务器，Esc 取消当前工作；完成提示保存、跳过、失败数量与失败原因。每个模型响应的 usage 写入 `mcp-hint-usage` custom entry，独立于主对话 usage。
-- 每项成功后立即写回其来源文件：全局项写全局 `mcp.json`，项目覆盖项写项目 `.mcp.json`。只处理合并后有效项，不修改被覆盖的全局项。
-- 写入使用文件 mutation queue、重新读取与配置身份/hint 检查、同目录临时文件和 rename；保留其他 JSON 字段及缩进。保存前检测到文件变化则失败，已被手工填写的 hint 或替换的配置跳过。
-- 取消/失败保留已完成写入，清理临时文件和进度组件。当前 session 的目录快照保持不变。
 
 ### 内部目录与连接
 

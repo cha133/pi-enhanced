@@ -60,8 +60,7 @@ MCP servers use a separate `mcpServers` configuration. Global servers live in `~
 {
   "mcpServers": {
     "exa": {
-      "url": "https://mcp.exa.ai/mcp",
-      "hint": "Search the web and retrieve webpage content."
+      "url": "https://mcp.exa.ai/mcp"
     },
     "blender": {
       "command": "uvx",
@@ -72,13 +71,11 @@ MCP servers use a separate `mcpServers` configuration. Global servers live in `~
 }
 ```
 
-An entry must contain exactly one of `url` or `command`. HTTP URLs use Streamable HTTP; the initial release does not fall back to legacy SSE or implement OAuth/headers. For stdio, `args` and string-valued `env` are optional, configured environment variables override inherited process variables, and the process runs in the Pi session cwd. Project entries fully replace same-named global entries. Configuration is read once per session; restart or open a new session after editing it.
+An entry must contain exactly one of `url` or `command`. HTTP URLs use Streamable HTTP; the initial release does not fall back to legacy SSE or implement OAuth/headers. For stdio, `args` and string-valued `env` are optional, configured environment variables override inherited process variables, and the process runs in the Pi session cwd. Project entries fully replace same-named global entries. Configuration is read once per session; restart or open a new session after editing it. Remove any existing `hint` fields from MCP configuration; they are no longer supported.
 
-Only the two MCP tools and a static directory of configured names and optional `hint` strings enter the initial context. Local configuration is read during session initialization; connections and tool discovery run in the background. Connection status and tool-list changes never modify the static tool surface.
+Only the two MCP tools and a static directory of configured server names enter the initial context. Local configuration is read during session initialization; connections and tool discovery run in the background. Connection status and tool-list changes never modify the static tool surface. Project instructions such as `AGENTS.md` can tell the agent when to use a particular server.
 
 `mcp_search({server: "exa"})` browses compact descriptions; add `query` to search, or `tool` to get an exact complete schema. `full: true` requests full definitions while browsing. Follow `nextOffset` for further pages. `mcp_call({server, tool, arguments})` validates against the live schema and executes the original tool.
-
-Run `/mcp-gen-hints` (or `/mcp-gen-hints exa`) to fill missing/blank hints with the currently selected model. The command shows progress, supports Esc cancellation, and saves each successful hint to its original global/project config without replacing existing hints. It makes separate model requests only when explicitly invoked; their usage is recorded in session custom entries. New hints apply at the next session initialization (or `/reload`), keeping the current directory stable. You can also write hints yourself in any language. No server-provided description or separate hint cache is used.
 
 Model-facing `mcp_call` text is capped across all returned text blocks at 50 KB or 2,000 lines. Oversized text keeps a head preview and an explicit truncation notice; the complete text is written to a private system-temporary file. Image blocks pass through separately. In the TUI, results are independently collapsed to three output rows and roughly 800 source characters until expanded with `Ctrl+O`.
 

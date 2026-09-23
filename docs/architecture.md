@@ -14,7 +14,6 @@ pi-enhanced/
 │       ├── edit.ts
 │       ├── mcp-config.ts
 │       ├── mcp-tools.ts
-│       ├── mcp-hints.ts
 │       ├── mcp.ts
 │       ├── mcp-rendering.ts
 │       ├── read.ts
@@ -64,7 +63,7 @@ flowchart TD
 - session info 在第一轮 `before_agent_start` 才同时捕获时间与当前模型，并写入 `session-info` custom entry；后续轮次、模型切换和 session resume 始终复用固定 prompt。
 - session title 只处理没有历史用户消息、没有现有名称的新会话。第一轮 `before_agent_start` 立即启动不阻塞主回答的当前模型请求。请求不设置模型输出 token 上限；prompt 要求中文与英文单词混排时保留一个空格，标题长度由 prompt 和返回后的 60 字符清洗共同约束，不对中英文边界做代码改写。完成后通过 `setSessionName()` 持久化，请求失败或纯图片首条消息静默保留 pi 默认名称。
 - fork 不调用标题模型：若继承到名称，则把末尾 ` (n)` 递增，或首次追加 ` (1)`；未命名 fork 保留 pi 默认名称。
-- `mcp-config.ts` 不依赖 SDK，在 `session_start` 读取本地配置；`mcp-tools.ts` 同步构造固定 search/call 与静态目录。SDK 仍后台导入并由 `mcp.ts` 管理连接，`tools/list_changed` 只更新内存目录。`mcp-hints.ts` 注册显式生成命令，进度/取消与配置写回独立于目录快照。`session_shutdown` 失效化尚未完成的导入并关闭 manager 与 transport。
+- `mcp-config.ts` 不依赖 SDK，在 `session_start` 读取本地配置；`mcp-tools.ts` 同步构造固定 search/call 与静态目录。SDK 仍后台导入并由 `mcp.ts` 管理连接，`tools/list_changed` 只更新内存目录。`session_shutdown` 失效化尚未完成的导入并关闭 manager 与 transport。
 
 ## 复用边界
 
@@ -82,7 +81,7 @@ flowchart TD
 - edit 的逐项分类、冲突消解和结果格式化。
 - vision fallback 的模型选择、stream 状态归约和 UI renderer。
 - vision 顶层配置合并与校验。
-- 两层 MCP 配置读取、严格校验、覆盖合并、懒加载搜索/调用、hint 生成写回以及 MCP content 到 pi tool result 的适配。
+- 两层 MCP 配置读取、严格校验、覆盖合并、懒加载搜索/调用以及 MCP content 到 pi tool result 的适配。
 
 ## 工具激活协调器
 
@@ -106,12 +105,11 @@ flowchart TD
 - session title 请求同时绑定当前 agent signal 与 session-scoped abort controller；session shutdown、reload 或切换时取消，异步结果写入前再次核对 session id 和当前名称，避免覆盖手工 `/name` 或串写新会话。
 ## MCP 生命周期与工具面
 
-- manager 由当前 session 独占，配置按全局/可信项目 server 名覆盖合并，保留来源路径用于 hint 写回。连接并行且有 30 秒启动期限；调用只等待目标服务器，取消等待不影响共享连接。
-- 模型工具集合固定为 `mcp_search` / `mcp_call`，基于现有 active set 增加，保留其他扩展工具。服务器名称/hint 快照按名称排序并写入 search description，不受连接状态或目录变化影响。
+- manager 由当前 session 独占，配置按全局/可信项目 server 名覆盖合并。连接并行且有 30 秒启动期限；调用只等待目标服务器，取消等待不影响共享连接。
+- 模型工具集合固定为 `mcp_search` / `mcp_call`，基于现有 active set 增加，保留其他扩展工具。服务器名称快照按名称排序并写入 search description，不受连接状态或目录变化影响。
 - `mcp_search` 负责名称/描述/参数名加权匹配、分页浏览和完整定义读取；schema 留在内存直到模型请求，不动态注册搜索结果。
 - `mcp_call` 复用 Pi 的 raw JSON Schema 参数验证，再路由到最新目录对应的 SDK client；保留取消、图片、错误和文本总预算保护。
 - 历史直接工具只注册非激活 renderer placeholder；新的固定工具同样使用折叠 renderer，session resume 仍可显示历史结果。
-- `/mcp-gen-hints` 使用当前模型注册表的独立 complete 请求和可取消 loader，usage 单独记为 custom entry。只给缺失项生成；配置写回使用文件 mutation queue、重新读取与身份/hint 检查、同目录临时文件/rename，不修改内存快照。
 - stdio stderr 管道持续消费，仅错误时展示有界尾部。MCP 文本共享 50 KB / 2,000 行预算，超限完整文本写系统临时文件，图片单独传递。搜索定义按条目分页，单个定义完整保留，不使用会截坏 JSON Schema 的文本裁剪。
 - TUI 折叠最多 3 行/约 800 字符，Ctrl+O 展开保留经过模型侧保护后的原文。
 

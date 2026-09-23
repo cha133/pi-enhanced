@@ -3,7 +3,6 @@ import { activateEnhancedTools } from "./lib/activation.js";
 import { createEnhancedEditTool } from "./lib/edit.js";
 import { loadMcpConfig, type LoadedMcpConfig } from "./lib/mcp-config.js";
 import { createMcpTools } from "./lib/mcp-tools.js";
-import { registerMcpHintCommand } from "./lib/mcp-hints.js";
 import { collectHistoricalMcpToolNames, createHistoricalMcpToolDefinition } from "./lib/mcp-rendering.js";
 import type { McpManager } from "./lib/mcp.js";
 import { createEnhancedReadTool } from "./lib/read.js";
@@ -29,7 +28,6 @@ export default function piEnhanced(pi: ExtensionAPI): void {
 		if (!mcpManager) throw new Error("MCP initialization failed or session closed.");
 		return mcpManager;
 	};
-	registerMcpHintCommand(pi, getMcpManager, () => mcpConfig, getAgentDir());
 
 	const activateSurface = () => {
 		if (!shell) return;

@@ -16,7 +16,7 @@ export interface McpSearchInput {
 
 export function mcpDirectory(config: LoadedMcpConfig): string {
 	return [...config.servers].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
-		.map(([name, entry]) => `${JSON.stringify(name)}${entry.hint ? ` — ${JSON.stringify(entry.hint)}` : ""}`).join("\n");
+		.map(([name]) => JSON.stringify(name)).join("\n");
 }
 
 function words(text: string): string[] {
@@ -46,7 +46,7 @@ export async function searchMcp(config: LoadedMcpConfig, manager: McpManager, in
 	}
 	if (!server && !query && !input.full) {
 		const servers = [...config.servers].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
-		return { servers: servers.slice(offset, offset + limit).map(([name, entry]) => ({ name, ...(entry.hint ? { hint: entry.hint } : {}), status: manager.status(name) })), total: servers.length,
+		return { servers: servers.slice(offset, offset + limit).map(([name]) => ({ name, status: manager.status(name) })), total: servers.length,
 			...(offset + limit < servers.length ? { nextOffset: offset + limit } : {}) };
 	}
 	const unavailable: { server: string; error: string }[] = [];

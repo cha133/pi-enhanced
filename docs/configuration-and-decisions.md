@@ -39,8 +39,7 @@
 {
   "mcpServers": {
     "exa": {
-      "url": "https://mcp.exa.ai/mcp",
-      "hint": "Search the web and retrieve webpage content."
+      "url": "https://mcp.exa.ai/mcp"
     },
     "blender": {
       "command": "uvx",
@@ -54,7 +53,7 @@
 - 先读全局、再读项目；项目同名 server 完整替换全局项，不做字段深合并。
 - `url` 与 `command` 必须且只能出现一个。`url` 只支持绝对 HTTP(S) Streamable HTTP endpoint。
 - stdio 的 `args` 缺省为 `[]`；`env` 值必须都是字符串，并覆盖继承的 `process.env` 同名值；进程 cwd 固定为当前 Pi session cwd。
-- `hint` 是可选字符串，空白视为缺失，允许手写或通过 `/mcp-gen-hints [server]` 补齐；仅用于客户端静态目录，不传给服务器。命令写回原来源文件，新 hint 下次 session 初始化生效。
+- `hint` 已移除。旧配置中的 `hint` 必须删除，否则该 server 会按不支持字段报告配置错误。
 - 初版严格拒绝未支持字段；不支持 legacy SSE、headers、OAuth、`cwd` 与配置内环境变量插值。
 - 文件不存在是正常状态。单个文件、server 配置或连接失败会报告路径/server，但不阻止其他合法 server。
 - 配置每个 session 只读一次；修改后新开 session 生效。MCP server 自己发出的 `tools/list_changed` 仍动态生效。
@@ -102,8 +101,9 @@
 | D-035 | MCP client 在 `session_start` 后异步导入，避免 SDK 解析阻塞扩展加载；`PI_TIMING=1` 时额外记录 MCP 模块导入耗时 | 冷启动性能诊断 |
 | D-036 | 移除低频且无法由用户即时干预的子代理工具、顾问模型配置和全部子会话适配层 | 用户需求 |
 | D-037 | MCP 固定暴露 `mcp_search` / `mcp_call`，工具 schema 按需返回；轻量加权关键词搜索加完整可遍历目录兜底，无动态直接工具注册 | 用户确认 |
-| D-038 | MCP 目录只读取静态配置名称与可选 `hint`，启动时固定排序；不读取服务器简介、不自动生成、不维护独立缓存，连接状态不改变 prompt | 用户确认 |
-| D-039 | `/mcp-gen-hints [server]` 逐个用当前模型补齐缺失 hint，显示可取消进度，按配置来源写回并保留手工修改；新 hint 下次 session 初始化生效；简介不设字符硬上限或额外输出 token 上限，仅提取 text，不保存 thinking | 用户确认 |
+| D-038 | MCP 目录只读取静态配置名称与可选 `hint`，启动时固定排序；不读取服务器简介、不自动生成、不维护独立缓存，连接状态不改变 prompt（hint 部分已由 D-040 取代） | 用户确认 |
+| D-039 | `/mcp-gen-hints [server]` 逐个用当前模型补齐缺失 hint，显示可取消进度，按配置来源写回并保留手工修改；新 hint 下次 session 初始化生效；简介不设字符硬上限或额外输出 token 上限，仅提取 text，不保存 thinking（已由 D-040 取代） | 用户确认 |
+| D-040 | 移除 MCP hint 配置及生成命令；静态目录只显示 server 名，具体项目通过 `AGENTS.md` 等项目指令提示模型使用相关 MCP | 用户需求 |
 
 ## 待确认决策
 
