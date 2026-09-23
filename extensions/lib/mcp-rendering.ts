@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Text, type Component } from "@earendil-works/pi-tui";
+import { OneLine } from "./one-line.js";
 
 type PiToolDefinition = Parameters<ExtensionAPI["registerTool"]>[0];
 type PiContent = { type: "text"; text: string } | { type: "image"; data: string; mimeType: string };
@@ -69,6 +70,21 @@ export const renderMcpCall: NonNullable<PiToolDefinition["renderCall"]> = (args,
 			+ theme.fg("accent", `${displayName(input.server)} / ${displayName(input.tool)}`),
 		0, 0,
 	);
+};
+
+export const renderMcpSearch: NonNullable<PiToolDefinition["renderCall"]> = (args, theme) => {
+	const input = isRecord(args) ? args : {};
+	const fields = ["server", "tool", "query", "full", "limit", "offset"]
+		.flatMap((key) => {
+			const value = input[key];
+			if (typeof value === "string") return [`${key}=${JSON.stringify(value)}`];
+			if (typeof value === "boolean" || typeof value === "number" && Number.isFinite(value)) return [`${key}=${value}`];
+			return [];
+		});
+	return new OneLine([
+		{ text: "mcp_search", style: (text) => theme.fg("toolTitle", theme.bold(text)) },
+		{ text: fields.length > 0 ? ` ${fields.join(" ")}` : "", style: (text) => theme.fg("accent", text) },
+	]);
 };
 
 export const renderMcpResult: NonNullable<PiToolDefinition["renderResult"]> = (result, options, theme) => {

@@ -55,6 +55,20 @@ describe("MCP lazy discovery", () => {
 		expect(await searchMcp(config, manager, { server: "z", full: true, offset: 1 })).toMatchObject({ tools: [{ name: "next" }] });
 	});
 
+	test("search header shows supplied filters on one line", () => {
+		const definition = createMcpTools(config, async () => fakeManager([])).find((item) => item.name === "mcp_search")!;
+		const theme = { fg: (_color: string, text: string) => text, bold: (text: string) => text } as any;
+		const render = (args: unknown, width = 100) => definition.renderCall!(args, theme, {} as any).render(width);
+		expect(render({})).toEqual(["mcp_search"]);
+		expect(render({ server: "exa", query: "web search" })).toEqual(['mcp_search server="exa" query="web search"']);
+		expect(render({ server: "exa", tool: "web_search_exa", full: true, limit: 5, offset: 10 })).toEqual([
+			'mcp_search server="exa" tool="web_search_exa" full=true limit=5 offset=10',
+		]);
+		expect(render({ query: "line\nbreak" })).toEqual(['mcp_search query="line\\nbreak"']);
+		expect(render({ server: "exa", query: "web search" }, 24)).toHaveLength(1);
+		expect(render({ server: "exa", query: "web search" }, 24)[0]!.length).toBeLessThanOrEqual(24);
+	});
+
 	test("full search fits two 25 KB definitions in one 50 KiB page", async () => {
 		const manager = fakeManager([tool("first", "x".repeat(25_000)), tool("second", "x".repeat(25_000)), tool("third", "x".repeat(2_000))]);
 		const first = await searchMcp(config, manager, { server: "z", full: true, limit: 3 });

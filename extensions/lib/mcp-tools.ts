@@ -2,7 +2,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { Tool } from "@modelcontextprotocol/client";
 import type { LoadedMcpConfig } from "./mcp-config.js";
 import type { McpManager } from "./mcp.js";
-import { renderMcpCall, renderMcpResult } from "./mcp-rendering.js";
+import { renderMcpCall, renderMcpResult, renderMcpSearch } from "./mcp-rendering.js";
 
 type Definition = Parameters<ExtensionAPI["registerTool"]>[0];
 const MCP_SEARCH_PAGE_BYTES = 50 * 1024;
@@ -87,6 +87,7 @@ export async function searchMcp(config: LoadedMcpConfig, manager: McpManager, in
 export function createMcpTools(config: LoadedMcpConfig, getManager: () => Promise<McpManager>): Definition[] {
 	return [{
 		name: "mcp_search", label: "MCP search",
+		renderCall: renderMcpSearch,
 		description: "Discover MCP tools. No arguments lists servers; server alone browses compact tool descriptions. query searches names/descriptions/parameter names (prefer English keywords) and returns matching full schemas. server + tool retrieves an exact definition. full requests complete definitions while browsing. Follow nextOffset for more results; omit query to avoid keyword misses. Use mcp_call after inspecting the schema.\nConfigured MCP servers (static session snapshot):\n" + (mcpDirectory(config) || "(none)"),
 		parameters: { type: "object", properties: {
 			server: { type: "string" }, query: { type: "string" }, tool: { type: "string" }, full: { type: "boolean" },
