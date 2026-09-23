@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -6,6 +6,7 @@ import type { PassThrough } from "node:stream";
 import type { Tool as McpSdkTool } from "@modelcontextprotocol/client";
 import {
 	createStdioMcpTransport,
+	createMcpJsonSchemaValidator,
 	guardMcpOutput,
 	loadMcpConfig,
 	McpManager,
@@ -75,6 +76,26 @@ describe("MCP configuration", () => {
 });
 
 describe("MCP manager", () => {
+	test("numeric output format annotations do not write AJV warnings into the TUI", () => {
+		const schema = {
+			type: "object",
+			properties: { windows: { type: "array", items: { type: "object", properties: {
+				window_id: { type: "integer", format: "uint64", minimum: 0 },
+			} } } },
+			required: ["windows"],
+		} as const;
+		const warn = spyOn(console, "warn").mockImplementation(() => {});
+		try {
+			const validate = createMcpJsonSchemaValidator().getValidator(schema);
+			expect(validate({ windows: [{ window_id: 42 }] }).valid).toBe(true);
+			expect(validate({ windows: [{ window_id: -1 }] }).valid).toBe(false);
+			expect(warn).not.toHaveBeenCalled();
+			expect(schema.properties.windows.items.properties.window_id.format).toBe("uint64");
+		} finally {
+			warn.mockRestore();
+		}
+	});
+
 	test("pipes and bounds stdio server diagnostics instead of inheriting them into the TUI", () => {
 		const { transport, readStderr } = createStdioMcpTransport({ command: "unused" }, process.cwd());
 		const stderr = transport.stderr as PassThrough | null;

@@ -6,10 +6,12 @@ import {
 	Client,
 	StreamableHTTPClientTransport,
 	type CallToolResult,
+	type JsonSchemaType,
 	type Tool as McpSdkTool,
 } from "@modelcontextprotocol/client";
 import { validateToolArguments, type ToolCall } from "@earendil-works/pi-ai";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
+import { AjvJsonSchemaValidator } from "@modelcontextprotocol/client/validators/ajv";
 import {
 	DEFAULT_MAX_BYTES,
 	DEFAULT_MAX_LINES,
@@ -71,6 +73,28 @@ type PiContent = { type: "text"; text: string } | { type: "image"; data: string;
 
 const MCP_STDERR_MAX_CHARS = 8_192;
 
+// MCP servers may use OpenAPI numeric formats such as uint64. JSON Schema's
+// format keyword validates strings; AJV ignores unknown numeric formats but
+// logs a warning to the terminal while compiling the output schema.
+function withoutNumericFormats<T>(value: T): T {
+	if (Array.isArray(value)) return value.map(withoutNumericFormats) as T;
+	if (value === null || typeof value !== "object") return value;
+	const schema = value as Record<string, unknown>;
+	const result: Record<string, unknown> = {};
+	const types = Array.isArray(schema.type) ? schema.type : [schema.type];
+	const numericOnly = types.some((type) => type === "number" || type === "integer") && !types.includes("string");
+	for (const [key, item] of Object.entries(schema)) {
+		if (key === "format" && numericOnly) continue;
+		result[key] = ["const", "default", "enum", "examples"].includes(key) ? item : withoutNumericFormats(item);
+	}
+	return result as T;
+}
+
+export function createMcpJsonSchemaValidator() {
+	const validator = new AjvJsonSchemaValidator();
+	return { getValidator: <T>(schema: JsonSchemaType) => validator.getValidator<T>(withoutNumericFormats(schema)) };
+}
+
 function inheritedEnvironment(): Record<string, string> {
 	return Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined));
 }
@@ -108,6 +132,7 @@ async function connectMcpServer(
 	const client = new Client(
 		{ name: "pi-enhanced", version: "0.1.0" },
 		{
+			jsonSchemaValidator: createMcpJsonSchemaValidator(),
 			listChanged: {
 				tools: {
 					onChanged(error, tools) {

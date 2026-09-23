@@ -236,6 +236,7 @@ schema：
 ```
 
 - 从最新内部目录查找工具，以 Pi 的 `validateToolArguments` 验证/规范化原始 JSON Schema 参数，再通过发现工具的同一 SDK client 调用。
+- SDK 校验结构化输出时，忽略服务器 schema 中仅用于数字字段的 `format` 注解（例如 `uint64`）；保留原始目录/schema 及类型、范围等实际约束。这样 AJV 不会把未知数字格式的编译警告写入 TUI。
 - 未知 server/tool 或错误参数返回明确错误，不发送调用；目录变动后的旧工具名提示重新 search。
 - 父调用 `AbortSignal` 传给 SDK `callTool()`，由 SDK 执行对应 transport 的取消语义。
 - MCP text/image 直接映射为 Pi text/image。embedded text resource 附 URI；resource link 返回名称、描述与 URI；audio/binary resource 只返回类型/大小说明。
