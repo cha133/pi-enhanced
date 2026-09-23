@@ -5,6 +5,7 @@ import type { McpManager } from "./mcp.js";
 import { renderMcpCall, renderMcpResult } from "./mcp-rendering.js";
 
 type Definition = Parameters<ExtensionAPI["registerTool"]>[0];
+const MCP_SEARCH_PAGE_BYTES = 50 * 1024;
 export interface McpSearchInput {
 	server?: string;
 	query?: string;
@@ -73,7 +74,7 @@ export async function searchMcp(config: LoadedMcpConfig, manager: McpManager, in
 		};
 		const size = Buffer.byteLength(JSON.stringify(entry));
 		// Always return an individual definition intact, even if it alone exceeds the page budget.
-		if (results.length > 0 && bytes + size > 24_000) break;
+		if (results.length > 0 && bytes + size > MCP_SEARCH_PAGE_BYTES) break;
 		results.push(entry);
 		bytes += size;
 	}

@@ -49,10 +49,17 @@ describe("MCP lazy discovery", () => {
 	});
 
 	test("page budget never cuts an individual schema and full browsing remains traversable", async () => {
-		const large = tool("large", "x".repeat(30_000));
+		const large = tool("large", "x".repeat(60_000));
 		const manager = fakeManager([large, tool("next")]);
 		expect(await searchMcp(config, manager, { server: "z", full: true })).toMatchObject({ nextOffset: 1, tools: [{ description: large.description, inputSchema: large.inputSchema }] });
 		expect(await searchMcp(config, manager, { server: "z", full: true, offset: 1 })).toMatchObject({ tools: [{ name: "next" }] });
+	});
+
+	test("full search fits two 25 KB definitions in one 50 KiB page", async () => {
+		const manager = fakeManager([tool("first", "x".repeat(25_000)), tool("second", "x".repeat(25_000)), tool("third", "x".repeat(2_000))]);
+		const first = await searchMcp(config, manager, { server: "z", full: true, limit: 3 });
+		expect(first).toMatchObject({ total: 3, nextOffset: 2, tools: [{ name: "first" }, { name: "second" }] });
+		expect(await searchMcp(config, manager, { server: "z", full: true, offset: 2 })).toMatchObject({ tools: [{ name: "third" }] });
 	});
 
 	test("global search reports failed servers without losing healthy results", async () => {
