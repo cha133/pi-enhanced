@@ -16,7 +16,7 @@ Requires pi `1.1.0` or newer.
 
 `read` and `write` use pi's native definitions and keep their existing active states. There is no separate image-viewing tool.
 
-The extension also records the first user message's timestamp and first-turn model as fixed session metadata. It reuses that same information after later model switches and when the session is resumed.
+The extension also records the first user message's timestamp and timezone as fixed session metadata. It injects them through pi 1.1.0's structured `session_info` prompt section and reuses them on later turns and when the session is resumed. Model metadata is not injected; legacy entries retain their original datetime while model text is omitted.
 
 For a new empty session, the first text prompt immediately starts a non-blocking request to the current model for a concise session name. Manual names are never overwritten, failures and pure-image prompts keep pi's default name, and forks increment an inherited trailing ` (n)` suffix without another model request.
 

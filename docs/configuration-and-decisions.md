@@ -36,7 +36,7 @@
 | D-017 | 图片 detail 只控制分析深度；图片沿用 pi 自动等比缩放，不提供原始分辨率开关（read 相关部分已由 D-043 取代） | 用户确认 |
 | D-018 | pwsh 7 加载用户 profile 并注入 `TERM=dumb` | 用户确认 |
 | D-019 | edit 的参数级错误局部拒绝；即使全部 rejected 也返回普通结果，只有 I/O、取消或内部错误抛 tool error | 对齐结论 |
-| D-020 | 移植 `pi-extensions` session info，在首轮固定时间与模型并跨模型切换、session resume 复用 | 用户需求 |
+| D-020 | 移植 `pi-extensions` session info，在首轮固定时间与模型并跨模型切换、session resume 复用（模型注入与提示词注入方式已由 D-045 取代） | 用户需求 |
 | D-021 | 新空会话在首条用户消息后立即异步请求当前模型生成标题；不阻塞主回答，失败不重试且不覆盖手工名称 | 用户确认 |
 | D-022 | 标题跟随首条消息语言，清洗为无 Markdown/引号的纯文本并限制为 60 个 Unicode 字符；纯图片首条消息不生成 | 用户确认 |
 | D-023 | fork 不请求模型；继承标题追加或递增末尾 ` (n)`，未命名 fork 保持 pi 默认名称 | 用户确认 |
@@ -58,6 +58,7 @@
 | D-042 | 删除本包全部 MCP 实现、依赖和专用测试，迁移到 pi 内置 MCP；全局配置沿用，项目改用 `.pi/mcp.json`；最低 pi 1.1.0 | 用户要求；2026-10-09 |
 | D-043 | 移除纯文本模型读图兼容、vision 路由配置、流式进度与 image.query/detail；删除同名 read 覆盖及模型切换刷新，直接使用 pi 原生 read 并保留其启用状态 | 用户需求；2026-10-09 |
 | D-044 | Windows 上 Bun 1.4.2 实测未复现只读目录 recursive mkdir 的 EEXIST；删除临时 write 覆盖、注册代码及专用兼容测试，恢复 pi 原生 write 并保留其启用状态 | 用户确认；2026-10-09 |
+| D-045 | session info 改用 pi 1.1.0 的可变 `systemPromptOptions.sections.session_info` 注入，仅保留首轮固定时间与时区，移除首轮模型；恢复旧 entry 时保留原始时间但不注入模型文本，不改写历史数据 | 用户要求；2026-10-09 |
 
 ## 待确认决策
 

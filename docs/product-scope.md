@@ -13,7 +13,7 @@
 - 用户可见：异步 session metadata 请求以最终名称作为结果反馈。
 - 克制复制：借鉴 `pi-extensions` 与 Codex，但不把探索性复杂度整体搬入本项目。
 
-工具之外，package 还提供两项轻量 session 增强：首轮固定时间/模型 metadata，以及用首条用户消息异步生成的会话标题。
+工具之外，package 还提供两项轻量 session 增强：首轮固定时间/时区 metadata（不注入模型信息），以及用首条用户消息异步生成的会话标题。
 
 ## 工具表面
 

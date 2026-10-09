@@ -67,11 +67,14 @@ describe("single extension entry", () => {
 			expect(active).toContain("tool_search");
 			expect(active).toContain("mcp__exa__web_search_exa");
 			expect([...tools.keys()].some((name) => name.startsWith("mcp_"))).toBe(false);
-			const promptResult = await handlers.get("before_agent_start")?.[0]?.({ systemPrompt: "base" }, ctx) as
-				| { systemPrompt: string }
-				| undefined;
-			expect(promptResult?.systemPrompt).toContain("## Session info");
-			expect(promptResult?.systemPrompt).toContain("test/text (Text Model)");
+			const promptEvent = {
+				systemPrompt: "base",
+				systemPromptOptions: { sections: {} as Record<string, string> },
+			};
+			const promptResult = await handlers.get("before_agent_start")?.[0]?.(promptEvent, ctx);
+			expect(promptResult).toBeUndefined();
+			expect(promptEvent.systemPromptOptions.sections.session_info).toContain("The first user message");
+			expect(promptEvent.systemPromptOptions.sections.session_info).not.toContain("model");
 
 			ctx.model = { provider: "test", id: "vision", name: "Vision Model", input: ["text", "image"] };
 			for (const handler of handlers.get("model_select") ?? []) await handler({}, ctx);

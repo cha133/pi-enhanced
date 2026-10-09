@@ -49,7 +49,7 @@ flowchart TD
 - `write` 直接使用 pi 原生工具；本包不注册覆盖，保留其现有 active 状态。
 - `pwsh` 使用新名字，因此必须先注册，再把 `pwsh` 加入 active tools 并移除 `bash`。
 - `read` 直接使用 pi 原生工具，保留其现有 active 状态；本包不注册覆盖，也不在模型切换时刷新它。
-- session info 在第一轮 `before_agent_start` 才同时捕获时间与当前模型，并写入 `session-info` custom entry；后续轮次、模型切换和 session resume 始终复用固定 prompt。
+- session info 在第一轮 `before_agent_start` 捕获时间与时区，并写入 `session-info` custom entry；通过 pi 1.1.0 的 `event.systemPromptOptions.sections.session_info` 注入，不返回整段 `systemPrompt`，保留原生结构化提示词机制和其他扩展的 sections。后续轮次和 session resume 始终复用固定时间/时区，不依赖或注入模型信息。恢复旧版 custom entry 时只提取原始时间行，并重建不含模型信息的 prompt；不改写历史 entry，也不重新捕获时间。
 - session title 只处理没有历史用户消息、没有现有名称的新会话。第一轮 `before_agent_start` 立即启动不阻塞主回答的当前模型请求。请求不设置模型输出 token 上限；prompt 要求中文与英文单词混排时保留一个空格，标题长度由 prompt 和返回后的 60 字符清洗共同约束，不对中英文边界做代码改写。完成后通过 `setSessionName()` 持久化，请求失败或纯图片首条消息静默保留 pi 默认名称。
 - fork 不调用标题模型：若继承到名称，则把末尾 ` (n)` 递增，或首次追加 ` (1)`；未命名 fork 保留 pi 默认名称。
 

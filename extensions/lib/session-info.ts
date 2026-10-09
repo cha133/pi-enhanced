@@ -1,6 +1,5 @@
-/** Persist and inject fixed first-message time and first-turn model metadata. */
+/** Persist and inject fixed first-message time and timezone metadata. */
 
-import type { Model } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 export const SESSION_INFO_ENTRY_TYPE = "session-info";
@@ -44,16 +43,17 @@ function formatDatetime(timestamp: string, timeZone: string): string | undefined
 	return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second} (${timeZone}; ${instant.toISOString()})`;
 }
 
-export function formatSessionInfo(timestamp: string, timeZone: string, model: Model<any>): string | undefined {
+function formatDatetimePrompt(datetime: string): string {
+	return [
+		`The first user message in this session was submitted at ${datetime}.`,
+		"Treat the first-message datetime and timezone as fixed session metadata. They intentionally do not update on later turns or after resume.",
+	].join("\n");
+}
+
+export function formatSessionInfo(timestamp: string, timeZone: string): string | undefined {
 	const datetime = formatDatetime(timestamp, timeZone);
 	if (!datetime) return undefined;
-	return [
-		"## Session info",
-		"",
-		`The first user message in this session was submitted at ${datetime}.`,
-		`The model selected for the first turn is ${model.provider}/${model.id} (${model.name}).`,
-		"Treat the first-message datetime and first-turn model as fixed session metadata. They intentionally do not update on later turns, after model switches, or after resume.",
-	].join("\n");
+	return formatDatetimePrompt(datetime);
 }
 
 function restorePrompt(ctx: ExtensionContext): string | undefined {
@@ -62,7 +62,10 @@ function restorePrompt(ctx: ExtensionContext): string | undefined {
 	for (let index = entries.length - 1; index >= 0; index -= 1) {
 		const entry = entries[index];
 		if (!isSessionInfoEntry(entry)) continue;
-		if (entry.data?.sessionId === sessionId && typeof entry.data.prompt === "string") return entry.data.prompt;
+		if (entry.data?.sessionId !== sessionId || typeof entry.data.prompt !== "string") continue;
+		// Older entries also contain model metadata. Reuse only their original datetime.
+		const match = /^The first user message in this session was submitted at (.+)\.$/m.exec(entry.data.prompt);
+		if (match) return formatDatetimePrompt(match[1]!);
 	}
 	return undefined;
 }
@@ -75,9 +78,9 @@ export function registerSessionInfo(
 	let prompt: string | undefined;
 	let sessionId: string | undefined;
 
-	const initializePrompt = (model: Model<any> | undefined) => {
-		if (prompt || !model || !sessionId) return;
-		const value = formatSessionInfo(now().toISOString(), getTimeZone(), model);
+	const initializePrompt = () => {
+		if (prompt || !sessionId) return;
+		const value = formatSessionInfo(now().toISOString(), getTimeZone());
 		if (!value) return;
 		prompt = value;
 		pi.appendEntry<SessionInfoState>(SESSION_INFO_ENTRY_TYPE, { sessionId, prompt: value });
@@ -88,9 +91,9 @@ export function registerSessionInfo(
 		sessionId = ctx.sessionManager.getSessionId();
 	});
 
-	pi.on("before_agent_start", (event, ctx) => {
-		initializePrompt(ctx.model);
+	pi.on("before_agent_start", (event) => {
+		initializePrompt();
 		if (!prompt) return;
-		return { systemPrompt: `${event.systemPrompt}\n\n${prompt}` };
+		event.systemPromptOptions.sections.session_info = prompt;
 	});
 }
