@@ -175,7 +175,7 @@ describe("partial edit", () => {
 		}
 	});
 
-	test("renders a rejected-only summary without a leading blank line", async () => {
+	test("renders a rejected-only summary with pi's outputPad and no leading blank line", async () => {
 		const cwd = await mkdtemp(join(tmpdir(), "pi-enhanced-edit-render-"));
 		const path = join(cwd, "sample.txt");
 		await writeFile(path, "alpha\n", "utf8");
@@ -196,9 +196,11 @@ describe("partial edit", () => {
 					isError: false,
 					lastComponent: undefined,
 					state: {},
+					outputPad: 3,
 				} as any,
 			);
 			expect(rendered.render(80)[0]).toContain("Applied 0; rejected 1");
+			expect(rendered.render(80)[0]).toStartWith("   Applied");
 		} finally {
 			await rm(cwd, { recursive: true, force: true });
 		}

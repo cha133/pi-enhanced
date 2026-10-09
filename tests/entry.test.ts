@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import piEnhanced from "../extensions/pi-enhanced.js";
@@ -9,7 +9,6 @@ describe("single extension entry", () => {
 		const cwd = await mkdtemp(join(tmpdir(), "pi-enhanced-entry-"));
 		const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
 		process.env.PI_CODING_AGENT_DIR = cwd;
-		await writeFile(join(cwd, "mcp.json"), JSON.stringify({ mcpServers: {} }));
 		const handlers = new Map<string, Array<(...args: any[]) => unknown>>();
 		const tools = new Map<string, unknown>();
 		const entries: unknown[] = [{
@@ -20,7 +19,7 @@ describe("single extension entry", () => {
 				details: {},
 			},
 		}];
-		let active = ["read", "bash", "edit", "write", "third_party"];
+		let active = ["read", "bash", "edit", "write", "third_party", "codemode", "tool_search", "mcp__exa__web_search_exa"];
 		const pi = {
 			on(name: string, handler: (...args: any[]) => unknown) {
 				handlers.set(name, [...(handlers.get(name) ?? []), handler]);
@@ -64,19 +63,11 @@ describe("single extension entry", () => {
 			expect(active).toContain("write");
 			expect(active).not.toContain("view_image");
 			expect(active).toContain("third_party");
-			expect(active.filter((name) => name.startsWith("mcp_"))).toEqual(["mcp_search", "mcp_call"]);
+			expect(active).toContain("codemode");
+			expect(active).toContain("tool_search");
+			expect(active).toContain("mcp__exa__web_search_exa");
+			expect([...tools.keys()].some((name) => name.startsWith("mcp_"))).toBe(false);
 			expect((tools.get("read") as { description: string }).description).toContain("external vision model");
-			const historicalMcp = tools.get("mcp_unity_get_editor_state") as any;
-			expect(historicalMcp).toBeDefined();
-			expect(active).not.toContain("mcp_unity_get_editor_state");
-			const collapsed = historicalMcp.renderResult(
-				{ content: [{ type: "text", text: "line\n".repeat(20) }] },
-				{ expanded: false, isPartial: false },
-				{ fg: (_color: string, text: string) => text },
-			).render(80);
-			expect(collapsed).toHaveLength(4);
-			expect(collapsed.at(-1)).toContain("Ctrl+O to expand");
-
 			const promptResult = await handlers.get("before_agent_start")?.[0]?.({ systemPrompt: "base" }, ctx) as
 				| { systemPrompt: string }
 				| undefined;
@@ -86,6 +77,11 @@ describe("single extension entry", () => {
 			ctx.model = { provider: "test", id: "vision", name: "Vision Model", input: ["text", "image"] };
 			for (const handler of handlers.get("model_select") ?? []) await handler({}, ctx);
 			expect((tools.get("read") as { description: string }).description).toContain("direct inspection");
+			expect(active).toContain("mcp__exa__web_search_exa");
+			expect(active).toContain("codemode");
+			expect(active).toContain("tool_search");
+			expect(active).not.toContain("mcp_search");
+			expect(active).not.toContain("mcp_call");
 		} finally {
 			for (const handler of handlers.get("session_shutdown") ?? []) await handler({}, ctx);
 			if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;

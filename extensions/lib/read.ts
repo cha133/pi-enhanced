@@ -135,6 +135,7 @@ async function delegateVision(
 	signal: AbortSignal | undefined,
 	ctx: ExtensionContext,
 	onUpdate: AgentToolUpdateCallback<EnhancedReadDetails | undefined> | undefined,
+	request: typeof stream,
 ) {
 	let route;
 	try {
@@ -188,7 +189,7 @@ async function delegateVision(
 	publish(progress.current, true);
 
 	try {
-		const responseStream = stream(
+		const responseStream = request(
 			model,
 			{ systemPrompt: SYSTEM_PROMPTS[input.image?.detail ?? "standard"], messages: [message] },
 			{ apiKey: auth.apiKey, headers: auth.headers, env: auth.env, signal },
@@ -235,6 +236,7 @@ async function delegateVision(
 export function createEnhancedReadTool(
 	cwd: string,
 	ctx: ExtensionContext,
+	visionStream: typeof stream = stream,
 ): Parameters<ExtensionAPI["registerTool"]>[0] {
 	const nativeMode = supportsImages(ctx.model);
 	const manager = SettingsManager.create(cwd, getAgentDir(), { projectTrusted: ctx.isProjectTrusted() });
@@ -277,7 +279,11 @@ export function createEnhancedReadTool(
 			const result = await nativeRead.execute(toolCallId, nativeInput, signal, onUpdate, toolCtx);
 			if (!needsVisionFallback(result.content, toolCtx.model)) return result;
 			const image = findImage(result.content)!;
-			return delegateVision(image, input, signal, toolCtx, onUpdate);
+			const delegated = await delegateVision(image, input, signal, toolCtx, onUpdate, visionStream);
+			return {
+				...delegated,
+				structuredContent: delegated.content.map((part) => part.text).join("\n"),
+			};
 		},
 		renderCall(rawInput: unknown, theme, context) {
 			return nativeRead.renderCall!(rawInput as any, theme, context as any);

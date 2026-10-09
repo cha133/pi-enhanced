@@ -2,7 +2,20 @@
 
 版本：`0.1.0`
 
-最后更新：2026-09-23
+最后更新：2026-10-09
+
+## pi 1.1.0 升级与内置 MCP 迁移（2026-10-09）
+
+- 四个 pi 开发依赖锁定 `1.1.0`，peer dependencies 最低版本同步提升；对照本地 `../pi` 源码、changelog 和 npm 发布版本检查。
+- 删除本包的 MCP config/client/search/call/renderer、直接 SDK 依赖和专用测试。包仍只暴露一个扩展入口；pi 内置 MCP 的传递依赖保留。
+- 当前用户 `~/.pi/agent/mcp.json` 的两条配置符合内置格式，原文件直接由内置 MCP 接管，无需改写或搬移；settings 中没有禁用内置 MCP 的条目。项目迁移路径记录为 `.mcp.json` → `.pi/mcp.json`，本仓库没有待迁移项目配置。
+- `pi mcp list` 实际确认 Exa HTTP 连接（2 tools）与 cua-driver stdio 连接（57 tools）成功，默认 exposure 均为 codemode。
+- 增强 read 保留原生结构化输出；vision fallback 的成功、错误、取消终态均返回 codemode 可消费的文本，成功路径继续返回嵌套 usage；受控测试不访问模型或凭据。
+- edit 的 schema、队列、BOM/CRLF、模糊匹配与部分成功算法仍兼容；原生 renderer 的实际 diff 回填、折叠/展开与 rejected-only 布局回归通过。备用警告渲染跟随新版 `outputPad`。
+- shell 继续透传原生 `outputSchema` / `structuredContent` 和执行上下文，Windows PowerShell 7 实际执行测试通过；session info/title lifecycle 回归通过。上游 write 仍使用原来的 recursive mkdir，本包继续保留 EEXIST 目录确认补丁。
+- 完整 SDK session 从用户现有本地 package 配置加载本包，同时加载内置 MCP/codemode/tool_search，无扩展加载错误；受控 assistant tool call 通过内置 codemode 发现 Exa namespace 并调用增强 read，结束时触发 shutdown 释放连接。未调用真实主模型。
+- 自动验证：`npm run typecheck`、`npm test`（49 项）、`npm pack --dry-run` 通过。单入口及发布包无本包 MCP 模块；测试覆盖启动/模型切换保留内置 MCP 工具。
+- 本轮没有重跑真实视觉模型或交互 TUI 目视验收；非 Windows 实机验收仍延期。下方旧版 MCP 验收仅为历史记录，相关代码和测试现已删除，不再作为本包验收项。
 
 ## pi 0.87.1 升级
 

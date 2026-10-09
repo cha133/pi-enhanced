@@ -2,7 +2,7 @@
 
 ## 定位
 
-`pi-enhanced` 是一个面向日常编码的单入口 pi 扩展包。它不追求尽可能多的 agent tools，而是在 pi 原生四工具表面上做少量、高收益、可解释的增强，并通过固定的搜索与调用工具按需发现 MCP 能力。
+`pi-enhanced` 是一个面向日常编码的单入口 pi 扩展包。它不追求尽可能多的 agent tools，而是在 pi 原生四工具表面上做少量、高收益、可解释的增强；MCP 能力由 pi 内置扩展提供。
 
 设计取向：
 
@@ -19,11 +19,11 @@
 
 ### 目标有效工具矩阵
 
-| 环境 | 原生 `bash` | 增强 `read` | 增强 `write` | 原生 `edit` | `pwsh` | 增强 `edit` | `mcp_search` / `mcp_call` |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Windows + pwsh 7 | 禁用 | 启用 | 启用 | 被覆盖 | 启用 | 启用 | 启动时启用 |
-| Windows，无 pwsh 7 | 提示词被覆盖 | 启用 | 启用 | 被覆盖 | 不注册/不启用 | 启用 | 启动时启用 |
-| 非 Windows | 提示词被覆盖 | 启用 | 启用 | 被覆盖 | 不注册/不启用 | 启用 | 启动时启用 |
+| 环境 | 原生 `bash` | 增强 `read` | 增强 `write` | 原生 `edit` | `pwsh` | 增强 `edit` |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Windows + pwsh 7 | 禁用 | 启用 | 启用 | 被覆盖 | 启用 | 启用 |
+| Windows，无 pwsh 7 | 提示词被覆盖 | 启用 | 启用 | 被覆盖 | 不注册/不启用 | 启用 |
+| 非 Windows | 提示词被覆盖 | 启用 | 启用 | 被覆盖 | 不注册/不启用 | 启用 |
 
 说明：
 
@@ -32,7 +32,7 @@
 - fallback 环境保留原生 `bash` 执行实现，但同名 override 只增加通用 shell/ripgrep guidance，不指导模型用 shell 读取文件。
 - `read` 不引入 `pi-extensions` 的 hashline 格式或 session grounding 状态。
 - 自定义工具只应调整自己负责的内置工具名，不得意外移除其他扩展的有效工具。
-- MCP 只暴露 `mcp_search` / `mcp_call`；静态服务器名称目录帮助发现，具体工具 schema 按需读取。项目可通过 `AGENTS.md` 提示模型何时使用特定服务器。
+- MCP 由 pi 内置扩展管理，本包不连接服务器或注册 MCP 工具，保留其有效工具。
 
 ## 非目标
 
@@ -41,7 +41,7 @@
 - 不引入 hashline edit 协议或 session grounding 状态。
 - 不实现通用多 shell 抽象；`pwsh` 只面向 Windows PowerShell 7。
 - 不复刻 Codex sandbox、审批策略或 unified exec 协议。
-- MCP 初版不支持 legacy SSE、OAuth、HTTP 自定义 headers、resources/prompts 或通用第三方扩展工具继承。
+- 不实现 MCP client、配置验证、工具搜索或历史 MCP 渲染。
 
 ## 成功标准
 
@@ -50,6 +50,6 @@
 - fallback 环境仍能使用 pi 原生 `bash`，扩展不会因缺少 pwsh 而启动失败。
 - 一次包含多个 replacements 的 `edit` 调用中，单个坏参数不会迫使模型重发已经成功的参数。
 - 多模态与文本模型都通过增强 `read` 读取图片，文本模型 fallback 期间用户持续看到活动状态。
-- stdio 与 Streamable HTTP MCP server 在后台连接，工具发现不阻塞首轮，工具调用传播取消。
+- 启动和模型切换均保留 pi 内置 MCP、codemode 与其他扩展工具。
 - 所有工具返回的嵌套调用都传播取消、清理资源，并正确计入 usage。
 - 新空会话的首条文本消息不会因标题生成增加首轮等待；成功后名称持久化，手工名称、失败请求和纯图片消息均保持可预测的退化行为。

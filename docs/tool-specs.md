@@ -4,7 +4,7 @@
 
 ### 临时兼容覆盖
 
-- 保持 pi 0.87.1 原生 `write` 的输入 schema、路径解析、mutation queue、取消检查、UTF-8 完整写入、返回文本和 TUI renderer；成功提示为 `Successfully wrote to <path>`，不报告字节数。
+- 保持 pi 1.1.0 原生 `write` 的输入 schema、路径解析、mutation queue、取消检查、UTF-8 完整写入、返回文本和 TUI renderer；成功提示为 `Successfully wrote to <path>`，不报告字节数。
 - 只替换本地 `mkdir` / `writeFile` operations；父目录仍使用 recursive mkdir 创建。
 - 若 recursive mkdir 抛出 `EEXIST`，必须再以 `stat` 确认该路径确实是目录才继续写入。路径是文件、无法确认或任何其他错误均原样失败。
 
@@ -64,7 +64,7 @@
 
 ### 输入
 
-沿用 pi 0.87.1 的批量 schema：
+沿用 pi 1.1.0 的批量 schema：
 
 ```ts
 {
@@ -158,7 +158,7 @@ schema：
 }
 ```
 
-- `path`、`offset`、`limit` 完全沿用 pi 0.87.1 原生 `read` schema 与语义。
+- `path`、`offset`、`limit` 完全沿用 pi 1.1.0 原生 `read` schema 与语义。
 - `image.query` 缺省为准确描述图片；用户有具体问题时模型应原样传达重点。
 - `image.detail` 控制 fallback system prompt 的深度，也可作为给原生模型的文字提示。
 - 文本结果保持原生内容、分页提示、50 KB / 2,000 行截断、错误和 renderer；不增加 hashline 标签、行锚点或 session grounding。
@@ -170,6 +170,7 @@ schema：
 - 复用 pi 的本地图片读取、MIME 判断和自动等比缩放，不裁切。默认遵循 pi 设置：最大 2000×2000，并将 base64 payload 控制在约 4.5 MB 内。
 - 返回 image content（以及必要的 query text），让当前模型在下一轮原生消费。
 - 不发起第二次模型调用。
+- 保留原生 `outputSchema` 和 `structuredContent`：文本为字符串，图片为含 `type/data/mimeType/note` 的对象，供 codemode 使用。
 - 工具 description/guidelines 明确说明图片由当前模型亲自查看；调用与结果继续使用原生 `read` renderer。
 
 ### 纯文本 fallback 路径
@@ -181,7 +182,7 @@ schema：
 3. 调用 `stream()`，消息包含 query 与 image content。
 4. 把 `start`、`thinking_delta`、`text_delta` 归约成用户可见的单行状态，经 `onUpdate` 约 100 ms 限流发布；流式阶段使用 `reasoning: `、`replying: ` 等小写前缀，终态使用 `finished · MODEL`。
 5. 最终只把 vision 模型文本回复返回给主模型，并按 pi 上限截断；文本文件读取绝不触发 vision fallback。
-6. 返回嵌套模型 usage；传播 abort。
+6. 返回嵌套模型 usage；传播 abort。成功、失败和取消的终态 `structuredContent` 均为最终可见文本字符串，避免 codemode 收到原图片或空结果。
 
 工具 description/guidelines 明确说明当前模型不能直接看图，`read` 会调用外挂 vision 模型，返回值是该模型的视觉描述而非当前模型的直接观察。
 
@@ -193,61 +194,6 @@ schema：
 - 缺少/错误 vision 配置、模型不支持图片、认证或 provider 错误：返回 `[Vision fallback failed: ...]` 普通文本结果，让主模型能解释或恢复。
 - fallback 最终没有文本：同上。
 
-## MCP 懒加载工具
+## MCP
 
-### 固定工具面与静态目录
-
-- 模型只看到 `mcp_search` 与 `mcp_call`，不再把每个 MCP tool 注册为 Pi tool。
-- `session_start` 等待本地配置读取完成，按 server 名固定排序，将名称放入 `mcp_search` description。不读服务器自带简介，不自动调用模型，不维护独立简介缓存。
-- 目录是当前 session 启动快照。连接顺序、连接成功与否、`tools/list_changed` 都不改变当前工具定义或 prompt。配置变更在下次 session 初始化（包括 `/reload`）时生效。
-- SDK 仍异步导入；server 在后台并行连接，启动读取本地配置后无需等待网络或子进程握手。每个连接与首次目录发现最多等待 30 秒。
-- 固定工具加入现有 active set，保留其他扩展工具。历史 `mcp_<server>_<tool>` 只注册非激活 renderer placeholder，继续支持 resume 时的折叠显示，不重新暴露旧工具。
-
-### `mcp_search`
-
-```ts
-{
-  server?: string;
-  query?: string;
-  tool?: string;
-  full?: boolean;
-  limit?: number; // 1–50；关键词搜索默认 5，其余默认 20
-  offset?: number; // 默认 0
-}
-```
-
-- 空参数：分页列出配置中的服务器名称和运行状态（connecting / ready / failed / closed）。
-- `server`：分页浏览该服务器工具名和最多 240 字符的简介，不含 schema。
-- `query`：搜索指定服务器或全部服务器，默认返回匹配项的完整工具定义；`full: false` 可请求轻量结果。
-- `server + tool`：精确读取一个完整定义，必须指定 server；不要求每次 call 前都重复 search。
-- `full: true`：显式请求完整定义，可配合无关键词浏览整个目录。
-- 本地检索按工具名、title、description 和顶层参数名加权；支持大小写归一、下划线/标点与 camelCase 拆词，精确工具名优先，多关键词宽松匹配。无 BM25、向量服务或额外模型请求。跨语言/同义词不保证命中，工具指导优先英文关键词，换词或省略 query 浏览兜底。
-- 返回 `total` 和可选 `nextOffset`。工具页预算为 50 KiB，按完整条目切分；单个超大定义仍完整返回，不裁断 schema。浏览摘要可以缩短描述，完整模式保留 SDK 返回的工具定义。
-- 精确服务器请求等待该服务器完成发现；跨服务器查询并行等待，对失败项返回 `unavailable`，不丢失健康服务器结果。调用者取消只取消当前等待，不关闭共享连接。
-- TUI 调用标题在一行内显示实际传入的 `server`、`tool`、`query`、`full`、`limit`、`offset`；空参数仅显示 `mcp_search`，超出终端宽度时裁切。
-
-### `mcp_call`
-
-```ts
-{
-  server: string;
-  tool: string; // MCP 原始工具名
-  arguments: Record<string, unknown>;
-}
-```
-
-- 从最新内部目录查找工具，以 Pi 的 `validateToolArguments` 验证/规范化原始 JSON Schema 参数，再通过发现工具的同一 SDK client 调用。
-- SDK 校验结构化输出时，忽略服务器 schema 中仅用于数字字段的 `format` 注解（例如 `uint64`）；保留原始目录/schema 及类型、范围等实际约束。这样 AJV 不会把未知数字格式的编译警告写入 TUI。
-- 未知 server/tool 或错误参数返回明确错误，不发送调用；目录变动后的旧工具名提示重新 search。
-- 父调用 `AbortSignal` 传给 SDK `callTool()`，由 SDK 执行对应 transport 的取消语义。
-- MCP text/image 直接映射为 Pi text/image。embedded text resource 附 URI；resource link 返回名称、描述与 URI；audio/binary resource 只返回类型/大小说明。
-- `structuredContent` 仅在没有原生 text/resource text 时序列化；details 不重复保存完整结构。MCP `isError` 转成 Pi tool error。
-- 所有返回 text blocks 合并共享 50 KB / 2,000 行总预算，超长单行保留 UTF-8 安全前缀。超限完整文本写入系统临时目录 `pi-mcp-*/output.txt`（mode `0600`），结果显示统计和路径；图片不计入文本预算。
-- details 保留 server、tool、可选 truncation 统计和完整文本路径。TUI 折叠最多 3 行/约 800 源字符；JSON 可紧实显示，展开保留原格式且不绕过输出硬上限。自定义调用标题始终显示 `mcp_call <server> / <tool>`，折叠、执行中、成功/错误及历史回放都可辨认目标；参数流尚未到达时以 `…` 占位。
-
-### 内部目录与连接
-
-- `tools/list_changed` 只更新内存中的完整目录，不改变 Pi 工具集合。
-- 使用 SDK 的聚合分页发现、协议握手和 transport 生命周期，不自行实现 MCP 协议。
-- stdio `stderr` 由扩展 pipe 并持续消费，正常诊断静默；连接失败只附最近 8,192 字符。
-- session shutdown 取消尚未完成的连接并关闭所有 client/transport。
+MCP 配置、发现、调用、取消、连接清理及渲染均由 pi 内置 MCP 扩展负责。本包不注册 MCP 工具或历史 renderer placeholder。工具激活必须保留现有的 codemode、tool_search 和 MCP 工具。

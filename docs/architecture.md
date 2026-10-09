@@ -12,10 +12,6 @@ pi-enhanced/
 │       ├── activation.ts
 │       ├── pwsh.ts
 │       ├── edit.ts
-│       ├── mcp-config.ts
-│       ├── mcp-tools.ts
-│       ├── mcp.ts
-│       ├── mcp-rendering.ts
 │       ├── read.ts
 │       ├── write.ts
 │       ├── session-info.ts
@@ -46,8 +42,6 @@ flowchart TD
     K["model_select"] --> L["刷新 read 的动态 prompt metadata"]
     B --> M["session info: session_start 恢复；before_agent_start 首次捕获并注入"]
     B --> N["session title: 首条消息异步请求当前模型；完成后持久化名称"]
-    B --> O["MCP: 启动读取静态配置并注册两个固定工具"]
-    O --> P["后台导入 SDK、连接与发现；目录只存内存"]
 ```
 
 关键约束：
@@ -63,7 +57,6 @@ flowchart TD
 - session info 在第一轮 `before_agent_start` 才同时捕获时间与当前模型，并写入 `session-info` custom entry；后续轮次、模型切换和 session resume 始终复用固定 prompt。
 - session title 只处理没有历史用户消息、没有现有名称的新会话。第一轮 `before_agent_start` 立即启动不阻塞主回答的当前模型请求。请求不设置模型输出 token 上限；prompt 要求中文与英文单词混排时保留一个空格，标题长度由 prompt 和返回后的 60 字符清洗共同约束，不对中英文边界做代码改写。完成后通过 `setSessionName()` 持久化，请求失败或纯图片首条消息静默保留 pi 默认名称。
 - fork 不调用标题模型：若继承到名称，则把末尾 ` (n)` 递增，或首次追加 ` (1)`；未命名 fork 保留 pi 默认名称。
-- `mcp-config.ts` 不依赖 SDK，在 `session_start` 读取本地配置；`mcp-tools.ts` 同步构造固定 search/call 与静态目录。SDK 仍后台导入并由 `mcp.ts` 管理连接，`tools/list_changed` 只更新内存目录。`session_shutdown` 失效化尚未完成的导入并关闭 manager 与 transport。
 
 ## 复用边界
 
@@ -73,7 +66,7 @@ flowchart TD
 - edit：复用 pi 导出的队列、路径、diff 与原生 self-rendered call renderer；result renderer 先委托原生逻辑回填实际 diff，再追加部分成功的折叠/展开警告。若部分成功算法所需函数未导出，再复制带来源注释的最小纯函数。
 - write：复用 `createWriteToolDefinition()` 的完整 contract，只注入本地 `mkdir` / `writeFile` operations；`EEXIST` 仅在 `stat` 确认父路径为目录后忽略。
 - image：复用 pi 原生 read/image resize 路径或可导出的 image helpers，不重新实现图片格式解析。
-- MCP：使用官方 TypeScript SDK 的 client、stdio transport 与 Streamable HTTP transport，不自行实现协议握手、分页、取消或 session transport。
+- MCP：完全委托 pi 内置扩展，不维护连接与工具注册。
 
 ### 允许本地实现
 
@@ -81,7 +74,6 @@ flowchart TD
 - edit 的逐项分类、冲突消解和结果格式化。
 - vision fallback 的模型选择、stream 状态归约和 UI renderer。
 - vision 顶层配置合并与校验。
-- 两层 MCP 配置读取、严格校验、覆盖合并、懒加载搜索/调用以及 MCP content 到 pi tool result 的适配。
 
 ## 工具激活协调器
 
@@ -103,19 +95,16 @@ flowchart TD
 - 同一调用中的重叠 edit 不可同时应用；冲突策略见工具契约。
 - vision fallback 接受主调用的 `AbortSignal`，并在终止路径停止 timer 与 stream 订阅。
 - session title 请求同时绑定当前 agent signal 与 session-scoped abort controller；session shutdown、reload 或切换时取消，异步结果写入前再次核对 session id 和当前名称，避免覆盖手工 `/name` 或串写新会话。
-## MCP 生命周期与工具面
+## 内置 MCP 协作
 
-- manager 由当前 session 独占，配置按全局/可信项目 server 名覆盖合并。连接并行且有 30 秒启动期限；调用只等待目标服务器，取消等待不影响共享连接。
-- 模型工具集合固定为 `mcp_search` / `mcp_call`，基于现有 active set 增加，保留其他扩展工具。服务器名称快照按名称排序并写入 search description，不受连接状态或目录变化影响。
-- `mcp_search` 负责名称/描述/参数名加权匹配、分页浏览和完整定义读取；schema 留在内存直到模型请求，不动态注册搜索结果。
-- `mcp_call` 复用 Pi 的 raw JSON Schema 参数验证，再路由到最新目录对应的 SDK client；保留取消、图片、错误和文本总预算保护。
-- 历史直接工具只注册非激活 renderer placeholder；新的固定工具同样使用折叠 renderer，session resume 仍可显示历史结果。
-- stdio stderr 管道持续消费，仅错误时展示有界尾部。MCP 文本共享 50 KB / 2,000 行预算，超限完整文本写系统临时文件，图片单独传递。搜索定义按条目分页，单个定义完整保留，不使用会截坏 JSON Schema 的文本裁剪。
-- TUI 折叠最多 3 行/约 800 字符，Ctrl+O 展开保留经过模型侧保护后的原文。
+入口不读取 MCP 配置、不注册 MCP 工具或 renderer、不管理连接生命周期。激活协调器只变更自身工具，保留当前 active set 中的 MCP、codemode、tool_search 和其他扩展工具。
 
 ## 兼容性原则
 
-- 当前依赖与最低支持基线为 pi `0.87.1`。原生 read、write、shell wrapper 透传执行上下文；自定义 edit 同样优先使用调用时的 `ctx.cwd`，缺省时回退到构造器目录。
+- 当前依赖与最低支持基线为 pi `1.1.0`。原生 read、write、shell wrapper 透传执行上下文；自定义 edit 同样优先使用调用时的 `ctx.cwd`，缺省时回退到构造器目录。
 - 对 pi 的非公开实现复制必须记录上游文件与基线版本。
 - 对公开构造器的返回 shape 做最小 wrapper，不假定未声明字段永久存在。
 - 升级 pi 时重点回归：工具 details shape、renderer 继承、extension lifecycle、SettingsManager、nested usage 与 model stream event。
+
+- 原生 read 的结构化输出供 codemode 使用；vision fallback 终态必须返回文本 `structuredContent`，并继续传递 usage。
+- edit 的原生 renderer 接收 `outputPad`；部分成功警告遵循该缩进，继续复用原生实际 diff 回填与组件状态。

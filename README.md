@@ -1,8 +1,8 @@
 # pi-enhanced
 
-`pi-enhanced` is a single-entry pi package that keeps pi's native tool surface small while improving file reading and writing, batch editing, image inspection, and on-demand MCP tool discovery and calls.
+`pi-enhanced` is a single-entry pi package that keeps pi's native tool surface small while improving file reading and writing, batch editing, and image inspection.
 
-Requires pi `0.87.1` or newer.
+Requires pi `1.1.0` or newer.
 
 ## Tools
 
@@ -13,7 +13,6 @@ Requires pi `0.87.1` or newer.
 | `read` | Replaces pi's reader while preserving native text pagination, image processing, and rendering; text-only models transparently delegate image inspection to the configured vision model. |
 | `write` | Temporarily replaces pi's writer with its native contract plus a Bun/Windows workaround for existing read-only parent directories. |
 | `edit` | Replaces pi's edit with partial-success batch replacement. Valid disjoint entries are applied atomically; invalid and overlapping entries are returned by index with bounded previews. |
-| `mcp_search` / `mcp_call` | Discovers MCP tool schemas on demand and calls them through two fixed tools. Supports Streamable HTTP and stdio servers. |
 
 The built-in `read` and `write` names remain active and are overridden by enhanced definitions. The `write` override is a temporary compatibility fix and should be removed once pi or Bun handles recursive creation of existing read-only Windows directories correctly. There is no separate image-viewing tool.
 
@@ -54,32 +53,13 @@ Trusted projects may override individual fields in `.pi/settings.json`.
 
 - `vision` is required only when the current model cannot consume images. It must resolve to an image-capable model already registered in pi.
 
-MCP servers use a separate `mcpServers` configuration. Global servers live in `~/.pi/agent/mcp.json`; trusted projects may add or replace servers by name in `<project>/.mcp.json`:
+## Built-in MCP
 
-```json
-{
-  "mcpServers": {
-    "exa": {
-      "url": "https://mcp.exa.ai/mcp"
-    },
-    "blender": {
-      "command": "uvx",
-      "args": ["blender-mcp"],
-      "env": {}
-    }
-  }
-}
-```
+MCP is managed by pi itself. This package no longer registers `mcp_search` / `mcp_call`, opens MCP connections, or renders historical MCP tools. It preserves active tools owned by pi and other extensions, including codemode and tool search.
 
-An entry must contain exactly one of `url` or `command`. HTTP URLs use Streamable HTTP; the initial release does not fall back to legacy SSE or implement OAuth/headers. For stdio, `args` and string-valued `env` are optional, configured environment variables override inherited process variables, and the process runs in the Pi session cwd. Project entries fully replace same-named global entries. Configuration is read once per session; restart or open a new session after editing it. Remove any existing `hint` fields from MCP configuration; they are no longer supported.
+Existing `~/.pi/agent/mcp.json` configurations with `mcpServers` work unchanged. Move legacy project `.mcp.json` entries to `.pi/mcp.json` (merge existing entries carefully). Project configuration still requires trust. Remove instructions that call the old tools and use pi's built-in MCP discovery/calls instead.
 
-Only the two MCP tools and a static directory of configured server names enter the initial context. Local configuration is read during session initialization; connections and tool discovery run in the background. Connection status and tool-list changes never modify the static tool surface. Project instructions such as `AGENTS.md` can tell the agent when to use a particular server.
-
-`mcp_search({server: "exa"})` browses compact descriptions; add `query` to search, or `tool` to get an exact complete schema. `full: true` requests full definitions while browsing. Follow `nextOffset` for further pages. `mcp_call({server, tool, arguments})` validates against the live schema and executes the original tool.
-
-Model-facing `mcp_call` text is capped across all returned text blocks at 50 KB or 2,000 lines. Oversized text keeps a head preview and an explicit truncation notice; the complete text is written to a private system-temporary file. Image blocks pass through separately. In the TUI, results are independently collapsed to three output rows and roughly 800 source characters until expanded with `Ctrl+O`.
-
-This MCP client replaces the need for `pi-mcp-adapter` for the supported transports. Do not point both extensions at the same `.mcp.json`: each would open its own connection or stdio process and expose duplicate capabilities.
+Pi defaults servers to `codemode` exposure and automatically activates codemode when they connect. Use `/mcp` to inspect servers and `pi mcp list` to verify connections; run `/reload` after configuration changes. See pi's bundled `docs/mcp.md` for exposure, OAuth, and resource support.
 
 ## Image behavior
 

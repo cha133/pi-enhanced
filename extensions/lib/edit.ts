@@ -354,7 +354,7 @@ export function createEnhancedEditTool(cwd: string): ReturnType<typeof createEdi
 				callComponent.addChild(new Text(theme.fg("warning", output), 0, 0));
 				return component;
 			}
-			component.addChild(new Text(theme.fg("warning", output), 1, 0));
+			component.addChild(new Text(theme.fg("warning", output), context.outputPad ?? 1, 0));
 			return component;
 		},
 	};
