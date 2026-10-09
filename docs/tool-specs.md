@@ -2,13 +2,12 @@
 
 ## `write`
 
-### 临时兼容覆盖
+### 原生工具
 
-- 保持 pi 1.1.0 原生 `write` 的输入 schema、路径解析、mutation queue、取消检查、UTF-8 完整写入、返回文本和 TUI renderer；成功提示为 `Successfully wrote to <path>`，不报告字节数。
-- 只替换本地 `mkdir` / `writeFile` operations；父目录仍使用 recursive mkdir 创建。
-- 若 recursive mkdir 抛出 `EEXIST`，必须再以 `stat` 确认该路径确实是目录才继续写入。路径是文件、无法确认或任何其他错误均原样失败。
+- 直接使用 pi 1.1.0 原生 `write`，本包不注册覆盖，不注入本地 operations，保留其现有启用或禁用状态。
+- 输入 schema、路径解析、mutation queue、取消检查、父目录创建、UTF-8 完整写入和 TUI renderer 均由 pi 管理；成功提示为 `Successfully wrote to <path>`，不报告字节数。
 
-此覆盖专门规避 Bun 在 Windows 上对带只读属性的现有目录执行 recursive mkdir 时错误抛出 `EEXIST`。这是临时修复；升级 pi 或 Bun 时应先回归该场景，确认上游已修复后删除增强 `write`、注册代码与对应兼容测试，恢复原生工具。
+2026-10-09 在 Windows 上使用 Bun `1.4.2` 实测：带只读属性的现有目录 recursive mkdir 和 pi 原生 write 均成功，未复现原 `EEXIST` 问题，已移除临时兼容覆盖。
 
 ## `pwsh`
 

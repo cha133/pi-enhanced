@@ -4,6 +4,13 @@
 
 最后更新：2026-10-09
 
+## 移除 write 兼容覆盖（2026-10-09）
+
+- Windows 实机运行 Bun `1.4.2`（`744846f84`），以 `attrib +R` 设置并确认目录只读属性；现有目录 recursive mkdir、创建子目录、直接写文件、pi `1.1.0` 原生 write 和增强 write 均成功，文件内容正确。Node `v26.11.1` 对照正常；未确定最早修复版本。
+- 删除 write wrapper、入口注册和四项专用兼容测试；直接由 pi 提供原生 write。入口与激活测试覆盖不注册 write，以及保留原生 read/write 的启用和禁用状态。
+- 下方旧版 write 补丁验收为历史记录，当前实现已移除该补丁。
+- 自动验证：`npm run typecheck`、`npm test`（35 项）、`npm pack --dry-run` 通过；发布包不含 write wrapper，仍只有一个扩展入口。
+
 ## 移除读图兼容（2026-10-09）
 
 - 删除 read 覆盖、vision 配置路由、嵌套视觉请求、进度 renderer 和专用测试；read 完全由 pi 原生工具接管。

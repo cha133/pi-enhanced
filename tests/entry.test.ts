@@ -5,7 +5,7 @@ import { join } from "node:path";
 import piEnhanced from "../extensions/pi-enhanced.js";
 
 describe("single extension entry", () => {
-	test("registers the enhanced surface and preserves native read on session start", async () => {
+	test("registers the enhanced surface and preserves native read and write on session start", async () => {
 		const cwd = await mkdtemp(join(tmpdir(), "pi-enhanced-entry-"));
 		const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
 		process.env.PI_CODING_AGENT_DIR = cwd;
@@ -57,7 +57,7 @@ describe("single extension entry", () => {
 			for (const handler of handlers.get("session_start") ?? []) await handler({}, ctx);
 			expect([...tools.keys()]).toContain("edit");
 			expect([...tools.keys()]).not.toContain("read");
-			expect([...tools.keys()]).toContain("write");
+			expect([...tools.keys()]).not.toContain("write");
 			expect([...tools.keys()].some((name) => name === "bash" || name === "pwsh")).toBe(true);
 			expect(active).toContain("read");
 			expect(active).toContain("write");
@@ -82,6 +82,13 @@ describe("single extension entry", () => {
 			expect(active).toContain("tool_search");
 			expect(active).not.toContain("mcp_search");
 			expect(active).not.toContain("mcp_call");
+
+			active = active.filter((name) => name !== "read" && name !== "write");
+			for (const handler of handlers.get("session_start") ?? []) await handler({}, ctx);
+			expect([...tools.keys()]).not.toContain("write");
+			expect(active).not.toContain("read");
+			expect(active).not.toContain("write");
+			expect(active).toContain("third_party");
 		} finally {
 			for (const handler of handlers.get("session_shutdown") ?? []) await handler({}, ctx);
 			if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;

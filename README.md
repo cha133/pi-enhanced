@@ -1,6 +1,6 @@
 # pi-enhanced
 
-`pi-enhanced` is a single-entry pi package that keeps pi's native tool surface small while improving file writing, batch editing, and shell workflows.
+`pi-enhanced` is a single-entry pi package that keeps pi's native tool surface small while improving batch editing and shell workflows.
 
 Requires pi `1.1.0` or newer.
 
@@ -11,10 +11,10 @@ Requires pi `1.1.0` or newer.
 | `pwsh` | On Windows with PowerShell 7, replaces `bash`; loads the user profile, injects `TERM=dumb`, and includes PowerShell and ripgrep guidance. |
 | `bash` | On other systems, keeps pi's native execution and adds ripgrep workflow guidance. |
 | `read` | Uses pi's native reader unchanged, including text pagination, image attachments, and rendering. |
-| `write` | Temporarily replaces pi's writer with its native contract plus a Bun/Windows workaround for existing read-only parent directories. |
+| `write` | Uses pi's native writer unchanged, including directory creation, cancellation, and rendering. |
 | `edit` | Replaces pi's edit with partial-success batch replacement. Valid disjoint entries are applied atomically; invalid and overlapping entries are returned by index with bounded previews. |
 
-`read` uses pi's native definition and keeps its existing active state. `write` remains a same-name override. The `write` override is a temporary compatibility fix and should be removed once pi or Bun handles recursive creation of existing read-only Windows directories correctly. There is no separate image-viewing tool.
+`read` and `write` use pi's native definitions and keep their existing active states. There is no separate image-viewing tool.
 
 The extension also records the first user message's timestamp and first-turn model as fixed session metadata. It reuses that same information after later model switches and when the session is resumed.
 

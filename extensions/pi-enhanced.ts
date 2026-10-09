@@ -4,7 +4,6 @@ import { createEnhancedEditTool } from "./lib/edit.js";
 import { registerSessionInfo } from "./lib/session-info.js";
 import { registerSessionTitle } from "./lib/session-title.js";
 import { createEnhancedShell, type ShellRegistration } from "./lib/shell.js";
-import { createEnhancedWriteTool } from "./lib/write.js";
 
 export default function piEnhanced(pi: ExtensionAPI): void {
 	registerSessionInfo(pi);
@@ -24,11 +23,9 @@ export default function piEnhanced(pi: ExtensionAPI): void {
 	pi.on("session_start", (_event, ctx) => {
 		shell = createEnhancedShell(ctx.cwd);
 		const edit = createEnhancedEditTool(ctx.cwd);
-		const write = createEnhancedWriteTool(ctx.cwd);
 		pi.registerTool(shell.tool);
 		pi.registerTool(edit);
-		pi.registerTool(write);
-		enhancedToolNames = [shell.tool.name, edit.name, write.name];
+		enhancedToolNames = [shell.tool.name, edit.name];
 		activateSurface();
 	});
 }

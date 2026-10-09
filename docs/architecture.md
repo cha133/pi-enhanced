@@ -12,7 +12,6 @@ pi-enhanced/
 │       ├── activation.ts
 │       ├── shell.ts
 │       ├── edit.ts
-│       ├── write.ts
 │       ├── session-info.ts
 │       └── session-title.ts
 ├── tests/
@@ -30,7 +29,7 @@ flowchart TD
     A["扩展 factory"] --> B["注册生命周期处理器"]
     B --> C["session_start"]
     C --> D["探测 win32 与 pwsh 7"]
-    D --> E["保留原生 read，注册 write、edit 与 shell"]
+    D --> E["保留原生 read 与 write，注册 edit 与 shell"]
     D --> F{"pwsh 可用?"}
     F -->|是| G["注册 pwsh"]
     F -->|否| H["同名覆盖 bash prompt metadata，保留原生执行"]
@@ -47,7 +46,7 @@ flowchart TD
 - 探测结果可在扩展实例内缓存，session reload 时重新构造实例即可。
 - `setActiveTools()` 以 `pi.getActiveTools()` 为基础做集合变换：删除本扩展明确接管的工具，保留未知工具。
 - 注册同名 `edit` 覆盖执行；active tools 中仍使用名字 `edit`。
-- 注册同名 `write` 覆盖执行；复用原生 definition 并只注入兼容 Bun/Windows `EEXIST` 的本地 operations。官方 pi 或 Bun 修复后删除该临时覆盖。
+- `write` 直接使用 pi 原生工具；本包不注册覆盖，保留其现有 active 状态。
 - `pwsh` 使用新名字，因此必须先注册，再把 `pwsh` 加入 active tools 并移除 `bash`。
 - `read` 直接使用 pi 原生工具，保留其现有 active 状态；本包不注册覆盖，也不在模型切换时刷新它。
 - session info 在第一轮 `before_agent_start` 才同时捕获时间与当前模型，并写入 `session-info` custom entry；后续轮次、模型切换和 session resume 始终复用固定 prompt。
@@ -60,7 +59,7 @@ flowchart TD
 
 - shell：`createBashTool()` 或其 definition 对应构造器，保留输出聚合、50 KB / 2,000 行截断、timeout、取消、进程树终止和 TUI。
 - edit：复用 pi 导出的队列、路径、diff 与原生 self-rendered call renderer；result renderer 先委托原生逻辑回填实际 diff，再追加部分成功的折叠/展开警告。若部分成功算法所需函数未导出，再复制带来源注释的最小纯函数。
-- write：复用 `createWriteToolDefinition()` 的完整 contract，只注入本地 `mkdir` / `writeFile` operations；`EEXIST` 仅在 `stat` 确认父路径为目录后忽略。
+- write：直接由 pi 提供原生工具、目录创建、写入和渲染，本包不维护 wrapper。
 - image：复用 pi 原生 read/image resize 路径或可导出的 image helpers，不重新实现图片格式解析。
 - MCP：完全委托 pi 内置扩展，不维护连接与工具注册。
 
@@ -75,7 +74,7 @@ flowchart TD
 
 1. 读取当前 active names。
 2. 始终以增强 `edit` 接管 `edit` 名字（集合中名字不变）。
-3. 始终加入同名覆盖后的 `write`；`read` 的启用状态保持不变。
+3. `read` 与 `write` 的启用状态保持不变。
 4. 若 pwsh 可用，移除 `bash`、加入 `pwsh`；否则同名注册仅带通用 shell/ripgrep guidance 的 `bash` override、移除可能残留的 `pwsh` 并保留原先 `bash` 状态。
 5. 去重后一次调用 `setActiveTools()`。
 
@@ -84,7 +83,7 @@ flowchart TD
 ## 并发与原子性
 
 - `edit` 对同一绝对路径使用 `withFileMutationQueue()` 串行化完整的 read-classify-write 周期。
-- `write` 继续使用原生 definition 内的 mutation queue；增强层不改变并发边界。
+- `write` 由 pi 原生工具使用 mutation queue；本包不介入其执行。
 - accepted edits 基于同一个原始快照匹配，并在一次 write 中提交，避免逐项写盘导致后续匹配依赖前项。
 - 同一调用中的重叠 edit 不可同时应用；冲突策略见工具契约。
 - session title 请求同时绑定当前 agent signal 与 session-scoped abort controller；session shutdown、reload 或切换时取消，异步结果写入前再次核对 session id 和当前名称，避免覆盖手工 `/name` 或串写新会话。
@@ -94,7 +93,7 @@ flowchart TD
 
 ## 兼容性原则
 
-- 当前依赖与最低支持基线为 pi `1.1.0`。原生 read 由 pi 管理，write、shell wrapper 透传执行上下文；自定义 edit 同样优先使用调用时的 `ctx.cwd`，缺省时回退到构造器目录。
+- 当前依赖与最低支持基线为 pi `1.1.0`。原生 read、write 由 pi 管理，shell wrapper 透传执行上下文；自定义 edit 同样优先使用调用时的 `ctx.cwd`，缺省时回退到构造器目录。
 - 对 pi 的非公开实现复制必须记录上游文件与基线版本。
 - 对公开构造器的返回 shape 做最小 wrapper，不假定未声明字段永久存在。
 - 升级 pi 时重点回归：工具 details shape、renderer 继承、extension lifecycle、原生 read 设置、标题请求 usage 与 model stream event。

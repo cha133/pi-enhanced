@@ -19,7 +19,7 @@
 
 ### 目标有效工具矩阵
 
-| 环境 | 原生 `bash` | 原生 `read` | 增强 `write` | 原生 `edit` | `pwsh` | 增强 `edit` |
+| 环境 | 原生 `bash` | 原生 `read` | 原生 `write` | 原生 `edit` | `pwsh` | 增强 `edit` |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | Windows + pwsh 7 | 禁用 | 启用 | 启用 | 被覆盖 | 启用 | 启用 |
 | Windows，无 pwsh 7 | 提示词被覆盖 | 启用 | 启用 | 被覆盖 | 不注册/不启用 | 启用 |
@@ -27,7 +27,7 @@
 
 说明：
 
-- `write` 以同名定义保持原生 schema、路径解析、mutation queue、取消和渲染，仅临时替换本地目录创建操作，规避 Bun 在 Windows 上对带只读属性的现有目录错误抛出 `EEXIST`。官方 pi 或 Bun 修复后删除此覆盖。
+- `write` 直接使用 pi 原生工具；本包不覆盖其执行或注册，保留其现有启用或禁用状态。矩阵中的启用表示默认状态。
 - 文本与图片统一通过 pi 原生 `read`；本包不覆盖其执行、schema、提示词或渲染，不兼容纯文本模型读图。矩阵中的启用表示默认状态，用户已有的禁用状态保持不变。
 - fallback 环境保留原生 `bash` 执行实现，但同名 override 只增加通用 shell/ripgrep guidance，不指导模型用 shell 读取文件。
 - `read` 不引入 `pi-extensions` 的 hashline 格式或 session grounding 状态。
