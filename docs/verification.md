@@ -4,6 +4,21 @@
 
 最后更新：2026-10-09
 
+## PowerShell 引用与破坏性路径指导（2026-10-09）
+
+- 检查本地原始 session：`01a12012-39d2-76e2-9644-0ce1446b8bd8` 的 `powershell:5` 在嵌套插值中把 `\"` 留在实际源码，出现 CommandNotFound 错误但工具返回 exit 0；`01a12005-1642-7015-a01c-9173c7083c8a` 的 `powershell:26` 漏了字符串开引号，返回 exit 1。两条 session 的请求记录均包含旧的反引号指导，未发现执行器改写这些引号的证据；错误调用本身没有删除操作。
+- 补齐 JSON/PowerShell/原生命令参数三个层次的引用指导与例子；复杂代码通过 write 写临时脚本。增加最终绝对路径授权范围校验、LiteralPath、失败 throw 与禁止跨 shell 删除的 prompt 要求，不改变执行器语义，不构成强制安全边界。
+- 新增测试覆盖 5.1、7、未知版本的指导注入；经同一工具执行链实际验证单引号加倍、双引号反引号、格式化替代嵌套插值、JSON 解码及 here-string，PowerShell 7 与 5.1 均保留内容。删除文本仅作为输出字符串验证，不执行破坏性命令；无需凭据或外部模型。
+- 自动验证：`npm run typecheck`、`npm test`（51 项）、`npm pack --dry-run` 通过；未验证真实模型以后会始终遵循新指导。
+
+## PowerShell 版本与执行器绑定修复（2026-10-09）
+
+- 检查 session `01a11ffa-b183-76eb-96c3-785b2ddbe48b`：system rules 已为 7+，但 description 仍写可 fallback 到 5.1；实际版本调用返回 5.1，另一目录调用呈现 7 风格输出。证明指导与执行未绑定，未稳定复现当时单次 PATH 查找漂移的触发原因。
+- 初始化缓存原生选择的路径/参数/版本；固定路径 operations 保留原生进程生命周期，并记录 pi 1.1.0 来源。description、snippet 与 guidelines 明确实际版本和语法，未查明版本不静默换成 5.1。
+- 新增测试：配置/版本缓存、探测失败保留选定路径、查找失败、初始化后 PATH 切至只有 5.1 的目录时并发执行仍使用选定文件，以及实际 timeout/abort 回归。
+- 使用用户安装的 Scoop pi 1.1.0 二进制，禁用自动扩展、MCP 与网络，以临时扩展在 session_start 直接执行本包工具；三轮并发共六次均返回 7.6.6 和选定 pwsh.exe 路径，description 明确 PowerShell 7。未调用模型或修改用户设置/历史会话。
+- 自动验证：`npm run typecheck`、`npm test`（49 项）、`npm pack --dry-run` 通过；仍只有一个公开扩展入口。
+
 ## PowerShell 分版本语法指导（2026-10-09）
 
 - 原生解析器选定 PowerShell 后执行无 profile 主版本查询，进程 timeout 5 秒、输出上限 1 KB；成功与失败均缓存于扩展实例，reload 后重新探测。

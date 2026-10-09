@@ -61,6 +61,8 @@
 | D-045 | session info 改用 pi 1.1.0 的可变 `systemPromptOptions.sections.session_info` 注入，仅保留首轮固定时间与时区，移除首轮模型；恢复旧 entry 时保留原始时间但不注入模型文本，不改写历史数据 | 用户要求；2026-10-09 |
 | D-046 | 改用原生 powershell 同名适配：按标准顺序显式加载 profiles、注入 TERM=dumb；Windows 自动只启用 powershell，非 Windows 自动只启用 bash，停用旧 pwsh；允许原生 7 优先/5.1 fallback，默认补充 5.1 兼容语法与 rg 搜索指导（语法指导已由 D-047 取代），保留其他工具状态 | 用户要求；2026-10-09 |
 | D-047 | 按原生选择的 PowerShell 实际主版本分别注入指导：7+ 使用 && / ||，5.1 使用显式条件检查；标准引用及 rg 指导共用。初始化查询进程 timeout 5 秒且无 profile；成功/失败缓存于扩展实例，reload 后重新探测；失败不阻断工具，使用明确版本未知的兼容指导 | 用户要求；2026-10-09 |
+| D-048 | PowerShell 的可执行文件、启动参数与版本在初始化时一起缓存，后续调用固定执行该文件；description/snippet/guidelines 同步明确实际版本与语法，不再描述可能 fallback。原生 operations 不支持固定路径，最小适配其进程生命周期并记录 pi 1.1.0 来源；profile/TERM、流式/超时/取消/进程树清理与原生 renderer/schema 保留 | 用户报告会话版本漂移；2026-10-09 |
+| D-049 | 补强 PowerShell 引用指导：JSON 编码一次、单引号加倍、双引号反引号转义、避免嵌套插值/内联脚本，并区分原生命令参数层；破坏性文件操作须验证最终绝对路径、使用 LiteralPath、显式失败中止、不跨 shell 删除。属于 prompt 指导，不自动改写命令或宣称强制安全拦截 | 用户报告两条 session 引号错误与删除风险；2026-10-09 |
 
 ## 待确认决策
 

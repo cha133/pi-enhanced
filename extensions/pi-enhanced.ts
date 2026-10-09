@@ -1,15 +1,16 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { killPinnedPowerShellProcesses } from "./lib/powershell-process.js";
 import { activateEnhancedTools } from "./lib/activation.js";
 import { createEnhancedEditTool } from "./lib/edit.js";
 import { registerSessionInfo } from "./lib/session-info.js";
 import { registerSessionTitle } from "./lib/session-title.js";
-import { createEnhancedShell, createPowerShellVersionDetector, type ShellRegistration } from "./lib/shell.js";
+import { createEnhancedShell, createPowerShellRuntimeResolver, type ShellRegistration } from "./lib/shell.js";
 
 export default function piEnhanced(pi: ExtensionAPI): void {
 	registerSessionInfo(pi);
 	registerSessionTitle(pi);
 
-	const detectPowerShellVersion = createPowerShellVersionDetector();
+	const resolvePowerShellRuntime = createPowerShellRuntimeResolver();
 	let shell: ShellRegistration | undefined;
 	let enhancedToolNames: string[] = [];
 
@@ -21,8 +22,10 @@ export default function piEnhanced(pi: ExtensionAPI): void {
 		});
 	};
 
+	pi.on("session_shutdown", () => { killPinnedPowerShellProcesses(); });
+
 	pi.on("session_start", (_event, ctx) => {
-		shell = createEnhancedShell(ctx.cwd, process.platform, undefined, detectPowerShellVersion);
+		shell = createEnhancedShell(ctx.cwd, process.platform, undefined, resolvePowerShellRuntime);
 		const edit = createEnhancedEditTool(ctx.cwd);
 		pi.registerTool(shell.tool);
 		pi.registerTool(edit);

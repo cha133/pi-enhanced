@@ -16,26 +16,29 @@
 - Windows 同名适配 pi 1.1.0 原生 `powershell` 并启用它，移除 active set 中的 `bash` 和旧 `pwsh`。
 - macOS/Linux（及其他非 Windows 平台）同名适配并启用原生 `bash`，移除 active set 中的 `powershell` 和旧 `pwsh`。
 - 每次 session_start 基于现有 active set 计算，只调整接管的 shell 与 edit，保留 read/write 状态以及其他扩展、MCP、codemode 工具。
-- 不再探测 PowerShell 7 安装位置或注册自定义 `pwsh`。原生 PowerShell 在执行时通过 PATH 优先解析 `pwsh.exe`，找不到则使用 `powershell.exe`；两者均缺失时沿用原生调用错误，不切回 Bash。
+- 不再探测 PowerShell 7 安装位置或注册自定义 `pwsh`。初始化时通过原生解析器在 PATH 优先选择 `pwsh.exe`，找不到则选择 `powershell.exe`；选定的可执行文件及启动参数与版本一起缓存，后续调用固定使用该文件，不再次搜索 PATH 或静默切换。两者均缺失时返回原生查找错误，不切回 Bash；reload 后重新解析。
 - 平台选择覆盖先前 shell 的禁用状态。pi 的用户 `!` / `!!` 命令仍由 Bash 执行。
 
 ### 输入、执行与 profile
 
 沿用原生 `{ command: string; timeout?: number }`（timeout 单位秒）、outputSchema、structuredContent、调用时 cwd、streaming、timeout、abort、进程树终止、输出截断和 renderer。
 
-Windows 使用 `createPowerShellToolDefinition` 与 `createLocalPowerShellOperations`。保留原生 `-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command` 参数和 UTF-8 初始化，在同一命令作用域中依次 dot-source 存在的标准 profile：AllUsersAllHosts、AllUsersCurrentHost、CurrentUserAllHosts、CurrentUserCurrentHost。缺失 profile 跳过；profile 的输出和错误遵循 PowerShell 原生语义。进程启动前注入 `TERM=dumb`，profile 初始化可看到此环境变量；不修改用户 profile 或 settings。
+Windows 使用 `createPowerShellToolDefinition`；因原生 `createLocalPowerShellOperations` 不支持固定路径且每次调用重新查找，operations 使用以 pi 1.1.0 原生进程执行实现为来源的最小适配，绑定初始化选定的可执行文件。保留原生 `-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command` 参数和 UTF-8 初始化，在同一命令作用域中依次 dot-source 存在的标准 profile：AllUsersAllHosts、AllUsersCurrentHost、CurrentUserAllHosts、CurrentUserCurrentHost。缺失 profile 跳过；profile 的输出和错误遵循 PowerShell 原生语义。进程启动前注入 `TERM=dumb`，profile 初始化可看到此环境变量；不修改用户 profile 或 settings。
 
 ### Prompt guidance
 
 原生 `powershell` 的指导只有 PI_* 环境信息。本包保留其 metadata 并补充：
 
-- 明示 PowerShell 语法及 7 优先、5.1 fallback；环境变量使用 `$env:NAME`，路径检查用 `Test-Path`，引用的可执行路径用 `&`。
-- Windows 初始化时通过原生 `getPowerShellConfig()` 选择可执行文件，并用原生无 profile 参数查询 `$PSVersionTable.PSVersion.Major`。查询进程 timeout 为 5 秒，限制输出为 1 KB，不加载 profile、不显示窗口；成功和失败均在扩展实例内缓存，reload 后重新探测，非 Windows 不探测。
+- description、promptSnippet 与 promptGuidelines 明示当前会话选定的实际版本；description 同时显示执行路径，不再描述“可能回退到 5.1”。版本未知时明确未知，不伪称 5.1。环境变量使用 `$env:NAME`，路径检查用 `Test-Path`，引用的可执行路径用 `&`。
+- Windows 初始化时通过原生 `getPowerShellConfig()` 选择可执行文件，并用原生无 profile 参数查询 `$PSVersionTable.PSVersion.Major`。查询进程 timeout 为 5 秒，限制输出为 1 KB，不加载 profile、不显示窗口；可执行文件、参数、版本及失败均在扩展实例内缓存，reload 后重新探测，非 Windows 不探测。
 - 确认 7+ 时明确指导 `&&` 成功依赖链与 `||` 失败处理，不附加 5.1 兼容限制。
 - 确认 5 时明确禁止 `&&` / `||`，指导立即检查 `$?` 或原生命令的 `$LASTEXITCODE`，以显式 if/throw/exit 控制后续步骤；`$ErrorActionPreference='Stop'` 不能可靠处理原生命令失败。
-- 版本查询失败或无法识别时不阻断工具注册，明确版本未知，暂用兼容指导，允许模型确认版本后采用对应语法；引用、pipeline 与 rg 搜索指导两套共用。
+- 版本查询失败或无法识别时仍固定使用已选定的可执行文件，不阻断工具注册，明确版本未知，暂用兼容指导，允许模型确认版本后采用对应语法；引用、pipeline 与 rg 搜索指导两套共用。
 - `;` 仅连接无条件步骤，验证与破坏性修改不能以 `;` 串联。
 - 单引号字面量、双引号插值、反引号转义、合法多行 here-string、对象 pipeline 与 `Select-Object` 限制输出；不使用 `Invoke-Expression` 拼装整条命令。
+- `command` 是 JSON 解码后的 PowerShell 源码，JSON 只编码一次；明确区分传输层的 `\"` 与源码中的双引号，禁止用 Bash/C 风格 `\"` 转义 PowerShell 引号或再包一层 `pwsh -Command`。单引号内部用 `''`，双引号内部用反引号转义，并提供实际可执行例子。
+- 嵌套插值先计算或用 `-f` 格式化；复杂代码用原生 write 写入临时脚本再执行，文件内容优先 read/write/edit，避免内联 `bun -e` / `python -c` 的多层引用。原生命令参数传递是另一层引用，5.1 与 7 的行为不同，源码正确不保证内嵌引号原样传递。
+- 破坏性文件操作前在同一 PowerShell 作用域中验证最终绝对路径属于用户授权目录，拒绝空路径、盘符/共享根目录与意外目标；验证失败显式 throw，使用 `Remove-Item` / `Move-Item -LiteralPath -ErrorAction Stop`，不跨 shell 删除。引号不能关闭 `-Path` 通配符；引用/解析错误后先检查源码，不用破坏性命令试错。这些是模型指导，不是执行器的强制安全边界。
 - 搜索优先 `rg --files` / `rg -n`，禁止误用 `rg -r` / `rg -rn`。Windows 文件名筛选使用目录 PATH 与 `--glob`，不要将 `dir/*.go` 等 shell 通配路径传给 rg。
 - 非平凡分支、循环或结构化处理转为仓库外临时 TypeScript/Bun 脚本。
 

@@ -1,3 +1,4 @@
+import { createPinnedPowerShellOperations } from "./powershell-process.js";
 import { execFileSync } from "node:child_process";
 import {
 	createBashToolDefinition,
@@ -15,7 +16,10 @@ export const COMMON_SHELL_GUIDELINES = [
 
 export const POWERSHELL_GUIDELINES = [
 	"The powershell tool runs PowerShell, not bash/sh. Set environment variables with `$env:NAME = 'x'`, test paths with `Test-Path`, and invoke quoted executable paths with `& 'C:\\path\\app.exe' arg`.",
-	"Prefer single quotes for literal arguments. In double-quoted strings, PowerShell uses the backtick, not `\\`, for escaping. Prefer natural multiline syntax over fragile backtick line continuations.",
+	"The command field is PowerShell source after JSON decoding, not a quoted shell argument. Encode JSON once: JSON {\"command\":\"Write-Output \\\"hello\\\"\"} must decode to Write-Output \"hello\". Never leave bash/C-style \\\" in PowerShell source to escape a quote; backslash is a literal path character. Do not wrap the whole command in another quoted string or nested pwsh -Command.",
+	"Prefer single quotes for literal arguments: 'C:\\path with spaces\\file.txt', 'don''t', and 'say \"hello\"; $env:TERM' (literal dollar sign). Single quotes inside a single-quoted string are doubled. For interpolation use \"term=$env:TERM\"; for a literal double quote or dollar sign inside double quotes use a backtick: \"say `\"hello`\"; `$env:TERM\". Prefer natural multiline syntax over fragile backtick line continuations.",
+	"Avoid nested expandable strings and quote-heavy $() expressions. Compute values first or use formatting: Get-Command mise -All | ForEach-Object { '{0}: {1}' -f $_.CommandType, $_.Source }. Use native read/write/edit for file content; put complex code in a temporary script using write, then invoke the script with separate arguments instead of inline bun -e/python -c or generated command strings. Native executable argument passing is a separate quoting layer and differs across shell versions; do not assume correct PowerShell string syntax guarantees embedded quotes arrive unchanged.",
+	"Before any destructive file operation, validate the fully resolved absolute target against the user-authorized directory; reject empty paths, drive/share roots, and unexpected targets. Use Remove-Item/Move-Item with -LiteralPath and -ErrorAction Stop; quoting alone does not disable -Path wildcards. Keep validation and mutation in the same PowerShell scope with explicit throw on failure. Never pass generated paths through cmd /c, Invoke-Expression, or another shell for deletion. After a quoting/parsing error, inspect and correct the source before retrying; never experiment with destructive commands.",
 	"PowerShell pipelines pass objects rather than text. Limit output with `Select-Object -First N` or `-Last N`, and locate commands with `(Get-Command name).Source`.",
 	"For multiline native arguments, use a real multiline here-string: `@'` followed by a newline, the content, another newline, then `'@`. The opening marker must end its line and the closing marker must be alone at the start of a line.",
 	"Do not build a complete command string and pass it to `Invoke-Expression`; invoke executables directly and pass arguments separately.",
@@ -39,8 +43,7 @@ export function getPowerShellGuidelines(major: number | undefined): string[] {
 	return [...POWERSHELL_GUIDELINES, ...version];
 }
 
-function probePowerShellVersion(): string {
-	const config = getPowerShellConfig();
+function probePowerShellVersion(config: ReturnType<typeof getPowerShellConfig>): string {
 	return execFileSync(config.shell, [...config.args, "$PSVersionTable.PSVersion.Major"], {
 		encoding: "utf8",
 		timeout: 5000,
@@ -51,7 +54,7 @@ function probePowerShellVersion(): string {
 }
 
 // Cache both success and failure; a new extension instance (reload) gets a fresh probe.
-export function createPowerShellVersionDetector(probe: () => string = probePowerShellVersion): () => number | undefined {
+export function createPowerShellVersionDetector(probe: () => string): () => number | undefined {
 	let detected = false;
 	let major: number | undefined;
 	return () => {
@@ -69,7 +72,32 @@ export function createPowerShellVersionDetector(probe: () => string = probePower
 	};
 }
 
-const defaultVersionDetector = createPowerShellVersionDetector();
+export interface PowerShellRuntime {
+	config?: ReturnType<typeof getPowerShellConfig>;
+	major?: number;
+	error?: Error;
+}
+
+export function createPowerShellRuntimeResolver(
+	resolveConfig: () => ReturnType<typeof getPowerShellConfig> = getPowerShellConfig,
+	probe: (config: ReturnType<typeof getPowerShellConfig>) => string = probePowerShellVersion,
+): () => PowerShellRuntime {
+	let runtime: PowerShellRuntime | undefined;
+	return () => {
+		if (!runtime) {
+			try {
+				const selected = resolveConfig();
+				const config = { ...selected, args: [...selected.args] };
+				runtime = { config, major: createPowerShellVersionDetector(() => probe(config))() };
+			} catch (error) {
+				runtime = { error: error instanceof Error ? error : new Error(String(error)) };
+			}
+		}
+		return runtime;
+	};
+}
+
+const defaultRuntimeResolver = createPowerShellRuntimeResolver();
 
 // Native PowerShell starts with -NoProfile. Load the standard profiles explicitly,
 // in the same scope as the user command, while keeping native process flags and UTF-8 setup.
@@ -101,7 +129,7 @@ export function createEnhancedShell(
 	cwd: string,
 	platform: NodeJS.Platform = process.platform,
 	options?: PowerShellToolOptions,
-	detectVersion: () => number | undefined = defaultVersionDetector,
+	resolveRuntime: () => PowerShellRuntime = defaultRuntimeResolver,
 ): ShellRegistration {
 	if (platform !== "win32") {
 		const base = createBashToolDefinition(cwd);
@@ -111,9 +139,14 @@ export function createEnhancedShell(
 		};
 	}
 
+	const runtime = resolveRuntime();
+	const operations = options?.operations ?? (runtime.config
+		? createPinnedPowerShellOperations(runtime.config)
+		: { exec: async () => { throw runtime.error ?? new Error("No PowerShell executable resolved."); } });
+	const version = runtime.major !== undefined ? (runtime.major >= 7 ? `PowerShell ${runtime.major}` : `Windows PowerShell ${runtime.major === 5 ? "5.1" : runtime.major}`) : "PowerShell (version unknown)";
 	const base = createPowerShellToolDefinition(cwd, {
 		...options,
-		operations: createProfilePowerShellOperations(options?.operations),
+		operations: createProfilePowerShellOperations(operations),
 		spawnHook: (context) => {
 			const resolved = options?.spawnHook ? options.spawnHook(context) : context;
 			return { ...resolved, env: { ...resolved.env, TERM: "dumb" } };
@@ -123,8 +156,9 @@ export function createEnhancedShell(
 		name: "powershell",
 		tool: {
 			...base,
-			description: `${base.description} Prefers PowerShell 7, falls back to Windows PowerShell 5.1, loads standard profiles, and sets TERM=dumb.`,
-			promptGuidelines: mergeGuidelines(base.promptGuidelines, getPowerShellGuidelines(detectVersion())),
+			description: `${base.description} This session uses ${version}${runtime.config ? ` at ${runtime.config.shell}` : ""}. Use ${version} syntax. Standard profiles are loaded and TERM=dumb is set.`,
+			promptSnippet: `Execute ${version} commands`,
+			promptGuidelines: mergeGuidelines(base.promptGuidelines, getPowerShellGuidelines(runtime.major)),
 		},
 	};
 }

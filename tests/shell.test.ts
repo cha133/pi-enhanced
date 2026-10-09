@@ -5,7 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { createPowerShellToolDefinition, getPowerShellConfig } from "@earendil-works/pi-coding-agent";
-import { createEnhancedShell, createPowerShellVersionDetector, getPowerShellGuidelines, POWERSHELL_PROFILE_PREFIX } from "../extensions/lib/shell.js";
+import { createEnhancedShell, createPowerShellVersionDetector, createPowerShellRuntimeResolver, getPowerShellGuidelines, POWERSHELL_PROFILE_PREFIX } from "../extensions/lib/shell.js";
+import { createPinnedPowerShellOperations } from "../extensions/lib/powershell-process.js";
 
 const runFile = promisify(execFile);
 const quote = (value: string) => `'${value.replace(/'/g, "''")}'`;
@@ -26,7 +27,8 @@ describe("platform shell adaptation", () => {
 		expect(shell.name).toBe("powershell");
 		expect(shell.tool.parameters).toEqual(native.parameters);
 		expect(shell.tool.outputSchema).toEqual(native.outputSchema);
-		expect(shell.tool.promptSnippet).toBe(native.promptSnippet);
+		expect(shell.tool.promptSnippet).toContain("PowerShell");
+		expect(shell.tool.description).not.toContain("falls back");
 		expect(shell.tool.renderCall).toBeDefined();
 		expect(shell.tool.promptGuidelines).toEqual(expect.arrayContaining(native.promptGuidelines ?? []));
 	});
@@ -59,11 +61,54 @@ describe("platform shell adaptation", () => {
 		for (const term of ["PowerShell 5.1", "Do not use `&&` or `||`", "$LASTEXITCODE", "$?", "--glob", "Never put shell wildcards in PATH", "Invoke-Expression"]) expect(text).toContain(term);
 	});
 
+	test("quoting and destructive-path guidance reaches every Windows runtime", () => {
+		for (const major of [5, 7, undefined]) {
+			const tool = createEnhancedShell("/repo", "win32", undefined, () => ({ major })).tool;
+			const text = tool.promptGuidelines?.join("\n") ?? "";
+			for (const term of ["after JSON decoding", "Encode JSON once", "'don''t'", "'{0}: {1}' -f", "-LiteralPath", "explicit throw", "Never pass generated paths through cmd /c", "never experiment with destructive commands"]) expect(text).toContain(term);
+		}
+	});
+
+	test.skipIf(process.platform !== "win32")("JSON-decoded quoting examples execute as data on 7 and 5.1", async () => {
+		const config = getPowerShellConfig();
+		const legacy = join(process.env.SystemRoot ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+		const command = [
+			"Write-Output 'don''t'",
+			'Write-Output \'say "hello"; $env:TERM; Remove-Item C:\\ -Recurse\'',
+			'Write-Output "say `"hello`"; `$env:TERM"',
+			"[pscustomobject]@{ CommandType = 'Function'; Source = 'example' } | ForEach-Object { '{0}: {1}' -f $_.CommandType, $_.Source }",
+			"$bytes = [byte[]](65, 66)\n'decode UTF-8: ' + [Text.Encoding]::UTF8.GetString($bytes)",
+			"$data = @'\n{\"name\":\"don't\",\"literal\":\"$env:TERM\"}\n'@\nWrite-Output $data",
+		].join("\n");
+		const decoded = JSON.parse(JSON.stringify({ command }));
+		for (const executable of new Set([config.shell, legacy])) {
+			const selected = { ...config, shell: executable };
+			const tool = createEnhancedShell(process.cwd(), "win32", {
+				operations: createPinnedPowerShellOperations(selected),
+			}, () => ({ config: selected, major: executable === legacy ? 5 : 7 })).tool;
+			const result = await tool.execute("quoting", { ...decoded, timeout: 10 }, undefined, undefined,
+				{ cwd: process.cwd(), sessionManager: { getSessionId: () => "quoting-test", getSessionFile: () => undefined } } as any);
+			expect(result.structuredContent).toMatchObject({ exit_code: 0 });
+			const output = (result.structuredContent as { output: string }).output;
+			expect(output.trim().split(/\r?\n/)).toEqual([
+				"don't",
+				'say "hello"; $env:TERM; Remove-Item C:\\ -Recurse',
+				'say "hello"; $env:TERM',
+				"Function: example",
+				"decode UTF-8: AB",
+				'{"name":"don\'t","literal":"$env:TERM"}',
+			]);
+		}
+	}, 30000);
+
 	test("7+ receives modern chaining guidance without compatibility restrictions", () => {
 		for (const major of [7, 8]) {
-			const shell = createEnhancedShell("/repo", "win32", undefined, () => major);
+			const shell = createEnhancedShell("/repo", "win32", undefined, () => ({ major }));
 			const text = shell.tool.promptGuidelines?.join("\n") ?? "";
 			expect(text).toContain("Use `&&`");
+			expect(shell.tool.description).toContain(`This session uses PowerShell ${major}`);
+			expect(shell.tool.description).not.toContain("5.1");
+			expect(shell.tool.promptSnippet).toBe(`Execute PowerShell ${major} commands`);
 			expect(text).not.toContain("5.1");
 			expect(text).not.toContain("Do not use `&&`");
 			expect(text).toContain("--glob");
@@ -98,6 +143,63 @@ describe("platform shell adaptation", () => {
 	test("non-Windows construction never probes PowerShell", () => {
 		createEnhancedShell("/repo", "linux", undefined, () => { throw new Error("unexpected probe"); });
 	});
+
+	test("runtime resolver caches the exact probed executable and retains it when probing fails", () => {
+		let resolutions = 0;
+		let probes = 0;
+		const config = { shell: "C:\\PowerShell\\pwsh.exe", args: ["-NoProfile", "-Command"] };
+		const resolve = createPowerShellRuntimeResolver(() => { resolutions++; return config; }, (selected) => {
+			probes++;
+			expect(selected.shell).toBe(config.shell);
+			return "7";
+		});
+		const runtime = resolve();
+		expect(runtime).toMatchObject({ config, major: 7 });
+		expect(resolve()).toBe(runtime);
+		expect(resolutions).toBe(1);
+		expect(probes).toBe(1);
+		const unknown = createPowerShellRuntimeResolver(() => config, () => { throw new Error("timeout"); })();
+		expect(unknown.config?.shell).toBe(config.shell);
+		expect(unknown.major).toBeUndefined();
+	});
+
+	test("discovery failure is cached and does not silently select another shell", () => {
+		let calls = 0;
+		const resolve = createPowerShellRuntimeResolver(() => { calls++; throw new Error("missing shell"); });
+		expect(resolve().error?.message).toBe("missing shell");
+		expect(resolve().config).toBeUndefined();
+		expect(calls).toBe(1);
+	});
+
+	test.skipIf(process.platform !== "win32")("concurrent calls stay on the probed executable after PATH changes", async () => {
+		const system32 = join(process.env.SystemRoot ?? "C:\\Windows", "System32");
+		const script = `import { createEnhancedShell } from './extensions/lib/shell.ts';
+			const tool = createEnhancedShell(process.cwd()).tool;
+			for (const key of Object.keys(process.env)) if (key.toLowerCase() === 'path') delete process.env[key];
+			process.env.PATH = ${JSON.stringify(system32 + ";" + join(system32, "WindowsPowerShell", "v1.0"))};
+			const results = await Promise.all([0,1].map(() => tool.execute('pinned', {command: '$PSVersionTable.PSVersion.Major; (Get-Process -Id $PID).Path',timeout:10})));
+			console.log(JSON.stringify({ description: tool.description, snippet: tool.promptSnippet, results }));`;
+		const result = await runFile(process.execPath, ["-e", script], { cwd: process.cwd(), timeout: 20000, windowsHide: true });
+		const parsed = JSON.parse(result.stdout.trim());
+		const config = getPowerShellConfig();
+		for (const call of parsed.results) {
+			expect(call.structuredContent.exit_code).toBe(0);
+			expect(call.structuredContent.output).toContain(config.shell);
+		}
+		expect(parsed.description).toContain(config.shell);
+		expect(parsed.description).not.toContain("falls back");
+		expect(parsed.snippet).toContain("PowerShell");
+	}, 30000);
+
+	test.skipIf(process.platform !== "win32")("pinned execution preserves timeout and cancellation", async () => {
+		const tool = createEnhancedShell(process.cwd()).tool;
+		const ctx = { cwd: process.cwd(), sessionManager: { getSessionId: () => "test", getSessionFile: () => undefined } } as any;
+		await expect(tool.execute("timeout", { command: "Start-Sleep -Seconds 30", timeout: 0.2 }, undefined, undefined, ctx)).rejects.toThrow("Command timed out after 0.2 seconds");
+		const controller = new AbortController();
+		const cancellation = tool.execute("abort", { command: "Write-Output 'ready'; Start-Sleep -Seconds 30", timeout: 10 }, controller.signal,
+			(update) => { if (update.content.some((part) => part.type === "text" && part.text.includes("ready"))) controller.abort(); }, ctx);
+		await expect(cancellation).rejects.toThrow("Command aborted");
+	}, 30000);
 
 	test.skipIf(process.platform !== "win32")("native execution preserves UTF-8, cwd and nonzero exits", async () => {
 		const result = await createEnhancedShell(process.cwd()).tool.execute("call", {

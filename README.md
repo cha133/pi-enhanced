@@ -38,7 +38,7 @@ The package manifest exposes only `extensions/pi-enhanced.ts`; its internal modu
 
 ## Configuration
 
-No package-specific configuration is required. On Windows, the selected PowerShell executable is queried once per extension instance for version-specific guidance: 7+ uses `&&` / `||`, while 5.1 uses explicit conditionals. Failed detection falls back to compatible guidance; `/reload` refreshes the cached version. At session start, the package selects only `powershell` on Windows or `bash` on other platforms, removing the legacy `pwsh` name from the active set while preserving unrelated tools. Pi's `!` / `!!` commands continue to use Bash. Image resizing follows pi's native settings. The former top-level `vision` setting is no longer read by this package and can be removed.
+No package-specific configuration is required. On Windows, the selected executable and its arguments are fixed for the extension instance, and its version is queried once for matching descriptions and guidance: 7+ uses `&&` / `||`, while 5.1 uses explicit conditionals. Failed version detection keeps the selected executable and uses compatible guidance; `/reload` refreshes executable selection and version. Commands do not silently switch shells when PATH changes. At session start, the package selects only `powershell` on Windows or `bash` on other platforms, removing the legacy `pwsh` name from the active set while preserving unrelated tools. Pi's `!` / `!!` commands continue to use Bash. Image resizing follows pi's native settings. The former top-level `vision` setting is no longer read by this package and can be removed.
 
 ## Built-in MCP
 

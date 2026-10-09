@@ -11,6 +11,7 @@ pi-enhanced/
 │   └── lib/                 # 不被 pi 自动发现的内部实现
 │       ├── activation.ts
 │       ├── shell.ts
+│       ├── powershell-process.ts
 │       ├── edit.ts
 │       ├── session-info.ts
 │       └── session-title.ts
@@ -42,11 +43,11 @@ flowchart TD
 
 关键约束：
 
-- 用 process.platform 选择 shell；Windows 初始化时由原生解析器选择 PowerShell 并查询实际主版本，7+ / 5.1 分别注入语法指导。版本探测进程 timeout 5 秒、输出上限 1 KB，不加载 profile，成功与失败均按扩展实例缓存，reload 后重新探测；失败用未知版本兼容指导，非 Windows 不探测。执行仍由原生解析器优先选 7、fallback 到 5.1。
+- 用 process.platform 选择 shell；Windows 初始化时由原生解析器选择 PowerShell 并查询实际主版本，7+ / 5.1 分别注入语法指导。版本探测进程 timeout 5 秒、输出上限 1 KB，不加载 profile，成功与失败均按扩展实例缓存，reload 后重新探测；失败用未知版本兼容指导，非 Windows 不探测。初始化由原生解析器优先选 7、fallback 到 5.1；解析出的路径、参数和版本统一缓存。执行固定使用该路径，避免单次调用重新查找导致版本漂移，description/snippet/guidelines 同步说明实际版本。
 - `setActiveTools()` 以 `pi.getActiveTools()` 为基础做集合变换：删除本扩展明确接管的工具，保留未知工具。
 - 注册同名 `edit` 覆盖执行；active tools 中仍使用名字 `edit`。
 - `write` 直接使用 pi 原生工具；本包不注册覆盖，保留其现有 active 状态。
-- Windows 同名适配 `powershell`，通过 operations 包装显式加载标准 profiles，spawnHook 设置 TERM=dumb；保留原生 UTF-8、执行参数与 PS> renderer。
+- Windows 同名适配 `powershell`，通过 operations 包装显式加载标准 profiles，spawnHook 设置 TERM=dumb；保留原生 UTF-8、执行参数与 PS> renderer；原生 operations 未提供固定路径 API，因此 powershell-process.ts 记录来源并适配 pi 1.1.0 的 process lifecycle 与 stdio drain，保留流式、超时、取消和 taskkill 进程树清理。session_shutdown 清理本包跟踪的运行进程。
 - `read` 直接使用 pi 原生工具，保留其现有 active 状态；本包不注册覆盖，也不在模型切换时刷新它。
 - session info 在第一轮 `before_agent_start` 捕获时间与时区，并写入 `session-info` custom entry；通过 pi 1.1.0 的 `event.systemPromptOptions.sections.session_info` 注入，不返回整段 `systemPrompt`，保留原生结构化提示词机制和其他扩展的 sections。后续轮次和 session resume 始终复用固定时间/时区，不依赖或注入模型信息。恢复旧版 custom entry 时只提取原始时间行，并重建不含模型信息的 prompt；不改写历史 entry，也不重新捕获时间。
 - session title 只处理没有历史用户消息、没有现有名称的新会话。第一轮 `before_agent_start` 立即启动不阻塞主回答的当前模型请求。请求不设置模型输出 token 上限；prompt 要求中文与英文单词混排时保留一个空格，标题长度由 prompt 和返回后的 60 字符清洗共同约束，不对中英文边界做代码改写。完成后通过 `setSessionName()` 持久化，请求失败或纯图片首条消息静默保留 pi 默认名称。
@@ -64,7 +65,7 @@ flowchart TD
 
 ### 允许本地实现
 
-- PowerShell 标准 profile 加载、TERM 环境适配、实例级版本探测缓存与 5.1/7 分开的 prompt guidance。
+- PowerShell 标准 profile 加载、TERM 环境适配、实例级路径/版本缓存与 5.1/7 分开的 prompt guidance；原生未导出的固定路径进程适配保留明确来源。
 - edit 的逐项分类、冲突消解和结果格式化。
 
 ## 工具激活协调器
