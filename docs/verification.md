@@ -4,6 +4,21 @@
 
 最后更新：2026-10-09
 
+## PowerShell 分版本语法指导（2026-10-09）
+
+- 原生解析器选定 PowerShell 后执行无 profile 主版本查询，进程 timeout 5 秒、输出上限 1 KB；成功与失败均缓存于扩展实例，reload 后重新探测。
+- 7+ 直接指导 && / ||，不包含 5.1 兼容限制；5.1 指导显式条件检查；失败明确版本未知并提供临时兼容指导。通用引用、对象 pipeline 和 rg 指导共用。
+- 测试覆盖两套指导、未知版本、成功及失败缓存、异常/非法输出、非 Windows 不探测；实机 PATH 隔离验证 5.1 fallback 同时选择 5.1 指导。既有 profile、UTF-8 和执行行为回归保留。
+- 自动验证：`npm run typecheck`、`npm test`（45 项）、`npm pack --dry-run` 通过。
+
+## 原生 PowerShell 适配（2026-10-09）
+
+- 移除自定义 pwsh 注册与 PowerShell 7 路径探测，Windows 同名适配原生 powershell；非 Windows 自动启用原生 bash。停用另一平台 shell 和旧 pwsh，保留 read/write、MCP 与其他扩展状态。
+- 保留原生 UTF-8、参数、renderer、schema 与结构化结果；以 operations 前缀显式按标准顺序加载 profiles，并在 spawnHook 注入 TERM=dumb。兼容语法指导默认针对 5.1，明确限制 && / || 仅用于 7+。
+- 自动测试覆盖平台选择、原生 metadata、调用时 cwd、环境、取消信号、流式更新、timeout 透传、非零退出结果；Windows 实机覆盖 7 与 5.1 的 profile 加载顺序及同作用域函数可用性，并隔离 PATH 验证原生 5.1 fallback 和中文 UTF-8 输出。测试使用临时 profiles，不改动用户配置。
+- macOS/Linux 工具选择通过平台参数测试；非 Windows 实际 Bash 执行与交互 TUI 验收仍待对应设备。
+- 自动验证：`npm run typecheck`、`npm test`（40 项）、`npm pack --dry-run` 通过；仍只有一个公开扩展入口。
+
 ## 移除 write 兼容覆盖（2026-10-09）
 
 - Windows 实机运行 Bun `1.4.2`（`744846f84`），以 `attrib +R` 设置并确认目录只读属性；现有目录 recursive mkdir、创建子目录、直接写文件、pi `1.1.0` 原生 write 和增强 write 均成功，文件内容正确。Node `v26.11.1` 对照正常；未确定最早修复版本。

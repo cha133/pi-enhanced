@@ -9,55 +9,37 @@
 
 2026-10-09 在 Windows 上使用 Bun `1.4.2` 实测：带只读属性的现有目录 recursive mkdir 和 pi 原生 write 均成功，未复现原 `EEXIST` 问题，已移除临时兼容覆盖。
 
-## `pwsh`
+## Shell：`powershell` / `bash`
 
-### 可用条件
+### 平台与激活
 
-仅当同时满足以下条件时注册并启用：
+- Windows 同名适配 pi 1.1.0 原生 `powershell` 并启用它，移除 active set 中的 `bash` 和旧 `pwsh`。
+- macOS/Linux（及其他非 Windows 平台）同名适配并启用原生 `bash`，移除 active set 中的 `powershell` 和旧 `pwsh`。
+- 每次 session_start 基于现有 active set 计算，只调整接管的 shell 与 edit，保留 read/write 状态以及其他扩展、MCP、codemode 工具。
+- 不再探测 PowerShell 7 安装位置或注册自定义 `pwsh`。原生 PowerShell 在执行时通过 PATH 优先解析 `pwsh.exe`，找不到则使用 `powershell.exe`；两者均缺失时沿用原生调用错误，不切回 Bash。
+- 平台选择覆盖先前 shell 的禁用状态。pi 的用户 `!` / `!!` 命令仍由 Bash 执行。
 
-- `process.platform === "win32"`；
-- 能解析到 `pwsh.exe`；
-- 沿用 `pi-extensions` 的路径探测：检查 `PATH` 与常见 PowerShell 7 安装位置是否存在 `pwsh.exe`，不在 pi 启动期运行它。
+### 输入、执行与 profile
 
-不满足时不报错、不提示，保留用户原有的 pi `bash` 状态；入口仍用同名 override 保留原生执行并补充通用 shell/ripgrep guidance。
+沿用原生 `{ command: string; timeout?: number }`（timeout 单位秒）、outputSchema、structuredContent、调用时 cwd、streaming、timeout、abort、进程树终止、输出截断和 renderer。
 
-### 输入与执行
-
-保持 pi bash 的输入形状，仅把名字和描述改为 PowerShell：
-
-```ts
-{
-  command: string;
-  timeout?: number; // 秒
-}
-```
-
-- cwd 为当前 session cwd。
-- 使用 PowerShell 7，不使用 Windows PowerShell 5.1。
-- 复用 pi 的 streaming、timeout、abort、process-tree kill 与 truncation。
-- 加载用户 `$PROFILE` 并注入 `TERM=dumb`，减少遵循该环境标记的 profile 交互初始化和命令 ANSI 输出；行为用测试固定。
+Windows 使用 `createPowerShellToolDefinition` 与 `createLocalPowerShellOperations`。保留原生 `-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command` 参数和 UTF-8 初始化，在同一命令作用域中依次 dot-source 存在的标准 profile：AllUsersAllHosts、AllUsersCurrentHost、CurrentUserAllHosts、CurrentUserCurrentHost。缺失 profile 跳过；profile 的输出和错误遵循 PowerShell 原生语义。进程启动前注入 `TERM=dumb`，profile 初始化可看到此环境变量；不修改用户 profile 或 settings。
 
 ### Prompt guidance
 
-工具自身的 `promptGuidelines` 同时承载 shell 语法与工作流指导，不再另设修改 system prompt 的 shell-guidance 扩展：
+原生 `powershell` 的指导只有 PI_* 环境信息。本包保留其 metadata 并补充：
 
-- 明示工具运行 PowerShell 7，不是 bash/sh。
-- 环境变量使用 `$env:NAME`，路径检查使用 `Test-Path`，带空格的可执行路径用调用运算符 `&`。
-- 后续命令依赖前一步成功时使用 `&&`，失败处理使用 `||`；仅在后续命令必须无条件执行时使用 `;`。验证与破坏性修改不得用 `;` 串联，多步骤修改改用显式检查或 fail-fast 临时脚本。
-- 优先单引号表达字面量；说明双引号插值与反引号转义。
-- 不使用 `Invoke-Expression` 拼装整条命令。
-- PowerShell pipeline 传对象；限制输出用 `Select-Object -First N` / `-Last N`。
-- 文件发现优先 `rg --files`，内容搜索优先 `rg -n`；禁止误用 `rg -r`。
-- Windows 下用 `rg` 按文件名过滤时，PATH 只传目录（或 `.`），筛选用 `--glob`（如 `rg -n PATTERN dir --glob '*.go'` / `--glob '!*_test.go'`）；禁止写 `dir/*.go` 这类 shell 通配路径——pwsh 常原样传给 `rg`，而 Windows 路径不允许 `*`。
-- 非平凡分支、循环、结构化处理转为 `$env:TEMP` 下的临时 TypeScript，并用 Bun 执行。
+- 明示 PowerShell 语法及 7 优先、5.1 fallback；环境变量使用 `$env:NAME`，路径检查用 `Test-Path`，引用的可执行路径用 `&`。
+- Windows 初始化时通过原生 `getPowerShellConfig()` 选择可执行文件，并用原生无 profile 参数查询 `$PSVersionTable.PSVersion.Major`。查询进程 timeout 为 5 秒，限制输出为 1 KB，不加载 profile、不显示窗口；成功和失败均在扩展实例内缓存，reload 后重新探测，非 Windows 不探测。
+- 确认 7+ 时明确指导 `&&` 成功依赖链与 `||` 失败处理，不附加 5.1 兼容限制。
+- 确认 5 时明确禁止 `&&` / `||`，指导立即检查 `$?` 或原生命令的 `$LASTEXITCODE`，以显式 if/throw/exit 控制后续步骤；`$ErrorActionPreference='Stop'` 不能可靠处理原生命令失败。
+- 版本查询失败或无法识别时不阻断工具注册，明确版本未知，暂用兼容指导，允许模型确认版本后采用对应语法；引用、pipeline 与 rg 搜索指导两套共用。
+- `;` 仅连接无条件步骤，验证与破坏性修改不能以 `;` 串联。
+- 单引号字面量、双引号插值、反引号转义、合法多行 here-string、对象 pipeline 与 `Select-Object` 限制输出；不使用 `Invoke-Expression` 拼装整条命令。
+- 搜索优先 `rg --files` / `rg -n`，禁止误用 `rg -r` / `rg -rn`。Windows 文件名筛选使用目录 PATH 与 `--glob`，不要将 `dir/*.go` 等 shell 通配路径传给 rg。
+- 非平凡分支、循环或结构化处理转为仓库外临时 TypeScript/Bun 脚本。
 
-### fallback `bash` guidance
-
-非 Windows 或 Windows 无 pwsh 7 时，工具名仍为 `bash`，执行行为完全沿用 pi；override 只显式保留原 prompt metadata 并加入：
-
-- 文件发现与内容搜索仍优先 `rg --files` / `rg -n`。
-- 限制搜索或命令输出优先使用命令自身的 limit 参数，再考虑 `head` / `tail`。
-- 复杂逻辑转到系统临时目录中的 TypeScript/Bun 脚本；临时目录使用跨平台可解析方式，不在仓库遗留脚本。
+非 Windows 的 bash 保留原生执行与 metadata，仅添加通用 rg 搜索和临时 TypeScript/Bun 工作流指导。
 
 ## `edit`
 

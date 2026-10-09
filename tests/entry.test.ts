@@ -58,7 +58,8 @@ describe("single extension entry", () => {
 			expect([...tools.keys()]).toContain("edit");
 			expect([...tools.keys()]).not.toContain("read");
 			expect([...tools.keys()]).not.toContain("write");
-			expect([...tools.keys()].some((name) => name === "bash" || name === "pwsh")).toBe(true);
+			expect([...tools.keys()].some((name) => name === "bash" || name === "powershell")).toBe(true);
+			expect(active.filter((name) => ["bash", "powershell", "pwsh"].includes(name))).toEqual([process.platform === "win32" ? "powershell" : "bash"]);
 			expect(active).toContain("read");
 			expect(active).toContain("write");
 			expect(active).not.toContain("view_image");

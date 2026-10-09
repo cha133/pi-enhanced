@@ -12,7 +12,7 @@
 
 ### 不建议保留的配置
 
-- 不增加 pwsh 路径配置：先自动探测；只有真实用户需求出现时再考虑 override。
+- 不增加 PowerShell 路径配置：直接沿用 pi 原生 PATH 解析，7 优先、5.1 fallback。
 - 不增加 session title 模型配置：标题固定请求第一条消息触发时的当前模型。
 
 ## 已确认决策
@@ -21,7 +21,7 @@
 | --- | --- | --- |
 | D-001 | 项目聚焦极简有效的原生增强，不延续 `pi-extensions` 的功能堆叠目标 | 用户需求 |
 | D-002 | 交付只暴露一个扩展入口 | 用户需求 |
-| D-003 | Windows 且有 PowerShell 7 时提供 `pwsh` 并禁用 `bash`；否则使用原生 `bash` | 用户需求 |
+| D-003 | Windows 且有 PowerShell 7 时提供 `pwsh` 并禁用 `bash`；否则使用原生 `bash`（已由 D-046 取代） | 用户需求 |
 | D-004 | 覆盖 `edit`，并允许批量 replacements 部分成功 | 用户需求 |
 | D-005 | 单独提供 `view_image`，兼容多模态与 vision fallback（已由 D-031 取代） | 用户需求 |
 | D-006 | vision fallback 期间用户可看到模型实时进展（read 相关部分已由 D-043 取代） | 用户需求 |
@@ -34,7 +34,7 @@
 | D-015 | edit rejected 仅回传索引、错误信息和明确标注为不完整的有界预览 | 用户确认 |
 | D-016 | vision fallback 使用紧凑单行实时状态（read 相关部分已由 D-043 取代） | 用户确认 |
 | D-017 | 图片 detail 只控制分析深度；图片沿用 pi 自动等比缩放，不提供原始分辨率开关（read 相关部分已由 D-043 取代） | 用户确认 |
-| D-018 | pwsh 7 加载用户 profile 并注入 `TERM=dumb` | 用户确认 |
+| D-018 | pwsh 7 加载用户 profile 并注入 `TERM=dumb`（已由 D-046 取代） | 用户确认 |
 | D-019 | edit 的参数级错误局部拒绝；即使全部 rejected 也返回普通结果，只有 I/O、取消或内部错误抛 tool error | 对齐结论 |
 | D-020 | 移植 `pi-extensions` session info，在首轮固定时间与模型并跨模型切换、session resume 复用（模型注入与提示词注入方式已由 D-045 取代） | 用户需求 |
 | D-021 | 新空会话在首条用户消息后立即异步请求当前模型生成标题；不阻塞主回答，失败不重试且不覆盖手工名称 | 用户确认 |
@@ -59,6 +59,8 @@
 | D-043 | 移除纯文本模型读图兼容、vision 路由配置、流式进度与 image.query/detail；删除同名 read 覆盖及模型切换刷新，直接使用 pi 原生 read 并保留其启用状态 | 用户需求；2026-10-09 |
 | D-044 | Windows 上 Bun 1.4.2 实测未复现只读目录 recursive mkdir 的 EEXIST；删除临时 write 覆盖、注册代码及专用兼容测试，恢复 pi 原生 write 并保留其启用状态 | 用户确认；2026-10-09 |
 | D-045 | session info 改用 pi 1.1.0 的可变 `systemPromptOptions.sections.session_info` 注入，仅保留首轮固定时间与时区，移除首轮模型；恢复旧 entry 时保留原始时间但不注入模型文本，不改写历史数据 | 用户要求；2026-10-09 |
+| D-046 | 改用原生 powershell 同名适配：按标准顺序显式加载 profiles、注入 TERM=dumb；Windows 自动只启用 powershell，非 Windows 自动只启用 bash，停用旧 pwsh；允许原生 7 优先/5.1 fallback，默认补充 5.1 兼容语法与 rg 搜索指导（语法指导已由 D-047 取代），保留其他工具状态 | 用户要求；2026-10-09 |
+| D-047 | 按原生选择的 PowerShell 实际主版本分别注入指导：7+ 使用 && / ||，5.1 使用显式条件检查；标准引用及 rg 指导共用。初始化查询进程 timeout 5 秒且无 profile；成功/失败缓存于扩展实例，reload 后重新探测；失败不阻断工具，使用明确版本未知的兼容指导 | 用户要求；2026-10-09 |
 
 ## 待确认决策
 

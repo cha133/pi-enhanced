@@ -1,62 +1,148 @@
 import { describe, expect, test } from "bun:test";
-import {
-	createEnhancedShell,
-	PWSH_GUIDELINES,
-	resolvePwsh7Path,
-} from "../extensions/lib/shell.js";
+import { execFile } from "node:child_process";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { promisify } from "node:util";
+import { createPowerShellToolDefinition, getPowerShellConfig } from "@earendil-works/pi-coding-agent";
+import { createEnhancedShell, createPowerShellVersionDetector, getPowerShellGuidelines, POWERSHELL_PROFILE_PREFIX } from "../extensions/lib/shell.js";
 
-describe("PowerShell detection", () => {
-	test("deduplicates candidates and returns the first existing pwsh executable", () => {
-		const checked: string[] = [];
-		const path = resolvePwsh7Path(
-			{ PATH: "C:\\Tools;C:\\TOOLS", ProgramFiles: "C:\\Program Files" },
-			(candidate) => {
-				checked.push(candidate);
-				return candidate.toLowerCase().includes("tools\\pwsh.exe");
-			},
-		);
-		expect(path?.toLowerCase()).toBe("c:\\tools\\pwsh.exe");
-		expect(checked).toHaveLength(1);
+const runFile = promisify(execFile);
+const quote = (value: string) => `'${value.replace(/'/g, "''")}'`;
+
+describe("platform shell adaptation", () => {
+	for (const platform of ["darwin", "linux"] as const) {
+		test(`uses native bash with search guidance on ${platform}`, () => {
+			const shell = createEnhancedShell("/repo", platform);
+			expect(shell.name).toBe("bash");
+			expect(shell.tool.promptGuidelines?.join("\n")).toContain("rg --files");
+			expect(shell.tool.promptGuidelines?.join("\n")).not.toContain("PowerShell 5.1");
+		});
+	}
+
+	test("preserves the native powershell schema and prompt metadata", () => {
+		const shell = createEnhancedShell(process.cwd(), "win32");
+		const native = createPowerShellToolDefinition(process.cwd());
+		expect(shell.name).toBe("powershell");
+		expect(shell.tool.parameters).toEqual(native.parameters);
+		expect(shell.tool.outputSchema).toEqual(native.outputSchema);
+		expect(shell.tool.promptSnippet).toBe(native.promptSnippet);
+		expect(shell.tool.renderCall).toBeDefined();
+		expect(shell.tool.promptGuidelines).toEqual(expect.arrayContaining(native.promptGuidelines ?? []));
 	});
 
-	test("falls back to an enhanced bash definition outside Windows", () => {
-		const shell = createEnhancedShell("C:\\repo", "linux", {});
-		expect(shell.name).toBe("bash");
-		expect(shell.tool.promptGuidelines?.join("\n")).toContain("rg --files");
-		expect(shell.tool.promptGuidelines?.join("\n")).not.toContain("cat -- PATH");
-		expect(shell.tool.promptGuidelines?.join("\n")).not.toContain("sed -n");
-		expect(shell.tool.promptGuidelines?.join("\n")).not.toContain("Never put shell wildcards in PATH");
+	test("passes context, profiles, TERM, cancellation and streaming to operations", async () => {
+		const controller = new AbortController();
+		let observed: any;
+		let updates = 0;
+		const shell = createEnhancedShell("/initial", "win32", {
+			operations: { exec: async (command, cwd, options) => {
+				observed = { command, cwd, options };
+				options.onData(Buffer.from("done"));
+				return { exitCode: 0 };
+			} },
+			spawnHook: (context) => ({ ...context, env: { ...context.env, CUSTOM: "kept", TERM: "ansi" } }),
+		});
+		const result = await shell.tool.execute("call", { command: "Write-Output 'done'", timeout: 3 }, controller.signal,
+			() => { updates++; }, { cwd: "/current", sessionManager: { getSessionId: () => "session", getSessionFile: () => undefined } } as any);
+		expect(observed.command).toBe(`${POWERSHELL_PROFILE_PREFIX}\nWrite-Output 'done'`);
+		expect(observed.cwd).toBe("/current");
+		expect(observed.options.env).toMatchObject({ TERM: "dumb", CUSTOM: "kept", PI_SESSION_ID: "session" });
+		expect(observed.options.signal).toBe(controller.signal);
+		expect(observed.options.timeout).toBe(3);
+		expect(updates).toBeGreaterThan(0);
+		expect(result.structuredContent).toMatchObject({ output: "done", exit_code: 0 });
 	});
 
-	test("pwsh guidelines teach --glob instead of shell wildcards in rg PATH", () => {
-		const text = PWSH_GUIDELINES.join("\n");
-		expect(text).toContain("--glob");
-		expect(text).toContain("Never put shell wildcards in PATH");
-		expect(text).toContain("dir/*.go");
+	test("guidance covers 5.1 conditionals and Windows rg globs", () => {
+		const text = getPowerShellGuidelines(5).join("\n");
+		for (const term of ["PowerShell 5.1", "Do not use `&&` or `||`", "$LASTEXITCODE", "$?", "--glob", "Never put shell wildcards in PATH", "Invoke-Expression"]) expect(text).toContain(term);
 	});
 
-	test("pwsh guidelines distinguish conditional and unconditional command chains", () => {
-		const text = PWSH_GUIDELINES.join("\n");
-		expect(text).toContain("Use `&&`");
-		expect(text).toContain("`||` for failure handling");
-		expect(text).toContain("`;` only when");
-		expect(text).toContain("Never join validation and destructive mutation with `;`");
+	test("7+ receives modern chaining guidance without compatibility restrictions", () => {
+		for (const major of [7, 8]) {
+			const shell = createEnhancedShell("/repo", "win32", undefined, () => major);
+			const text = shell.tool.promptGuidelines?.join("\n") ?? "";
+			expect(text).toContain("Use `&&`");
+			expect(text).not.toContain("5.1");
+			expect(text).not.toContain("Do not use `&&`");
+			expect(text).toContain("--glob");
+		}
 	});
 
-	test("executes through PowerShell 7 with TERM=dumb when available", async () => {
-		const shell = createEnhancedShell(process.cwd());
-		if (shell.name !== "pwsh") return;
-		expect(shell.tool.promptSnippet).toBe("Run PowerShell 7 commands");
-		expect(shell.tool.promptGuidelines?.join("\n")).not.toContain("Get-Content");
-		expect(shell.tool.promptGuidelines?.join("\n")).toContain("Never put shell wildcards in PATH");
-		const result = await (shell.tool.execute as any)(
-			"call",
-			{ command: "Write-Output \"$($PSVersionTable.PSVersion.Major)|$env:TERM\"", timeout: 10 },
-			undefined,
-			undefined,
-			undefined,
-		);
-		const text = result.content.find((part: { type: string }) => part.type === "text")?.text ?? "";
-		expect(text).toContain("7|dumb");
+	test("unknown version receives compatible guidance without claiming 5.1", () => {
+		const text = getPowerShellGuidelines(undefined).join("\n");
+		expect(text).toContain("version detection was unavailable");
+		expect(text).not.toContain("This tool runs Windows PowerShell 5.1");
+		expect(text).toContain("$LASTEXITCODE");
 	});
+
+	test("version detector parses and caches successful probes", () => {
+		let calls = 0;
+		const detect = createPowerShellVersionDetector(() => { calls++; return "7\r\n"; });
+		expect(detect()).toBe(7);
+		expect(detect()).toBe(7);
+		expect(calls).toBe(1);
+		expect(createPowerShellVersionDetector(() => "5\r\n")()).toBe(5);
+	});
+
+	test("version detector caches failures and rejects malformed output", () => {
+		let calls = 0;
+		const detect = createPowerShellVersionDetector(() => { calls++; throw new Error("timeout"); });
+		expect(detect()).toBeUndefined();
+		expect(detect()).toBeUndefined();
+		expect(calls).toBe(1);
+		for (const output of ["", "noise\n7", "7.1", "0", "-1"]) expect(createPowerShellVersionDetector(() => output)()).toBeUndefined();
+	});
+
+	test("non-Windows construction never probes PowerShell", () => {
+		createEnhancedShell("/repo", "linux", undefined, () => { throw new Error("unexpected probe"); });
+	});
+
+	test.skipIf(process.platform !== "win32")("native execution preserves UTF-8, cwd and nonzero exits", async () => {
+		const result = await createEnhancedShell(process.cwd()).tool.execute("call", {
+			command: "Write-Output ('term=' + $env:TERM); Write-Output '中文 héllo €'; (Get-Location).Path; exit 9", timeout: 10,
+		}, undefined, undefined, { cwd: process.cwd(), sessionManager: { getSessionId: () => "test", getSessionFile: () => undefined } } as any);
+		expect(result.isError).toBe(true);
+		expect(result.structuredContent).toMatchObject({ exit_code: 9 });
+		const text = result.content.map((part) => part.type === "text" ? part.text : "").join("");
+		for (const value of ["term=dumb", "中文 héllo €", process.cwd()]) expect(text).toContain(value);
+	});
+
+	test.skipIf(process.platform !== "win32")("falls back to 5.1 through the native resolver when 7 is absent from PATH", async () => {
+		const system32 = join(process.env.SystemRoot ?? "C:\\Windows", "System32");
+		const legacyDirectory = join(system32, "WindowsPowerShell", "v1.0");
+		const env = { ...process.env };
+		for (const key of Object.keys(env)) if (key.toLowerCase() === "path") delete env[key];
+		env.PATH = `${system32};${legacyDirectory}`;
+		const script = `import { createEnhancedShell } from './extensions/lib/shell.ts';
+			const shell = createEnhancedShell(process.cwd());
+			const result = await shell.tool.execute('fallback', { command: "Write-Output ('version=' + $PSVersionTable.PSVersion.Major); Write-Output ('term=' + $env:TERM); Write-Output '中文 héllo €'", timeout: 10 });
+			console.log(JSON.stringify({ ...result, guidelines: shell.tool.promptGuidelines }));`;
+		const result = await runFile(process.execPath, ["-e", script], { cwd: process.cwd(), env, timeout: 20000, windowsHide: true });
+		const parsed = JSON.parse(result.stdout.trim());
+		expect(parsed.structuredContent.exit_code).toBe(0);
+		expect(parsed.guidelines.join("\n")).toContain("This tool runs Windows PowerShell 5.1");
+		for (const value of ["version=5", "term=dumb", "中文 héllo €"]) expect(parsed.structuredContent.output).toContain(value);
+	}, 30000);
+
+	test.skipIf(process.platform !== "win32")("loads profiles in order and command scope on 7 and 5.1", async () => {
+		const directory = await mkdtemp(join(tmpdir(), "pi-shell-profiles-"));
+		try {
+			const names = ["AllUsersAllHosts", "AllUsersCurrentHost", "CurrentUserAllHosts", "CurrentUserCurrentHost"];
+			const paths = names.map((_, index) => join(directory, `profile ${index}.ps1`));
+			for (let i = 0; i < paths.length; i++) await writeFile(paths[i]!, `$global:profileOrder += '${i}'; function Get-ProfileValue { 'profile-${i}' }`);
+			const setup = `$global:profileOrder = ''\n$PROFILE = [pscustomobject]@{ ${names.map((name, i) => `${name} = ${quote(paths[i]!)}`).join("; ")} }`;
+			const command = `${setup}\n${POWERSHELL_PROFILE_PREFIX}\nWrite-Output $global:profileOrder; Get-ProfileValue`;
+			const config = getPowerShellConfig();
+			const legacy = join(process.env.SystemRoot ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+			for (const executable of new Set([config.shell, legacy])) {
+				const result = await runFile(executable, [...config.args, command], { cwd: directory, timeout: 10000, windowsHide: true });
+				expect(result.stdout).toContain("0123");
+				expect(result.stdout).toContain("profile-3");
+			}
+		} finally {
+			await rm(directory, { recursive: true, force: true });
+		}
+	}, 30000);
 });

@@ -18,7 +18,7 @@ Read `docs/README.md` first, then open only the design document relevant to the 
 - Preserve the single-entry package surface declared in `package.json`.
 - Use pi's native `read` without an override and preserve its existing active state. Do not add vision fallback, hashline behavior, or a separate `view_image` tool.
 - Compute active tools from the existing active set and preserve tools registered by other extensions.
-- On Windows, expose `pwsh` only when PowerShell 7 is found; otherwise preserve the enhanced native `bash` path.
+- At session start, activate only native `powershell` on Windows (PowerShell 7 preferred, Windows PowerShell 5.1 fallback) or native `bash` on other platforms. Preserve profile loading, `TERM=dumb`, version-specific syntax and shared search guidance, and unrelated active tools.
 - Preserve `edit` partial-success semantics: classify replacements against one snapshot, reject every member of an overlap group, and commit accepted edits in one write.
 - Preserve native read cancellation and rendering; image reads do not make nested model calls.
 - Keep TypeScript strict and follow the existing tab-indented source style.
