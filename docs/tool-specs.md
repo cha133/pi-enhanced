@@ -142,57 +142,24 @@ details：
 
 ## `read`
 
-### 输入
+本包不再覆盖 `read`，直接使用 pi 1.1.0 原生工具，并保留用户现有的启用/禁用状态。
 
-schema：
+### 输入
 
 ```ts
 {
   path: string;
   offset?: number;
   limit?: number;
-  image?: {
-    query?: string;
-    detail?: "brief" | "standard" | "detailed";
-  };
 }
 ```
 
-- `path`、`offset`、`limit` 完全沿用 pi 1.1.0 原生 `read` schema 与语义。
-- `image.query` 缺省为准确描述图片；用户有具体问题时模型应原样传达重点。
-- `image.detail` 控制 fallback system prompt 的深度，也可作为给原生模型的文字提示。
-- 文本结果保持原生内容、分页提示、50 KB / 2,000 行截断、错误和 renderer；不增加 hashline 标签、行锚点或 session grounding。
-
-### 原生多模态路径
-
-若当前模型声明 image input：
-
-- 复用 pi 的本地图片读取、MIME 判断和自动等比缩放，不裁切。默认遵循 pi 设置：最大 2000×2000，并将 base64 payload 控制在约 4.5 MB 内。
-- 返回 image content（以及必要的 query text），让当前模型在下一轮原生消费。
-- 不发起第二次模型调用。
+- schema、路径解析、调用时 cwd、文本分页、50 KB / 2,000 行截断、错误、取消与 renderer 均由 pi 管理。
+- 本地图片读取、MIME 判断和自动缩放沿用 pi 设置及当前模型的图片输入限制；图片以附件交给当前模型查看。
 - 保留原生 `outputSchema` 和 `structuredContent`：文本为字符串，图片为含 `type/data/mimeType/note` 的对象，供 codemode 使用。
-- 工具 description/guidelines 明确说明图片由当前模型亲自查看；调用与结果继续使用原生 `read` renderer。
-
-### 纯文本 fallback 路径
-
-若当前模型不支持 image input：
-
-1. 读取顶层 `vision` 配置并解析已注册模型。
-2. 验证 fallback 模型声明 image input，并获取认证信息；发送与原生路径相同的预处理图片。
-3. 调用 `stream()`，消息包含 query 与 image content。
-4. 把 `start`、`thinking_delta`、`text_delta` 归约成用户可见的单行状态，经 `onUpdate` 约 100 ms 限流发布；流式阶段使用 `reasoning: `、`replying: ` 等小写前缀，终态使用 `finished · MODEL`。
-5. 最终只把 vision 模型文本回复返回给主模型，并按 pi 上限截断；文本文件读取绝不触发 vision fallback。
-6. 返回嵌套模型 usage；传播 abort。成功、失败和取消的终态 `structuredContent` 均为最终可见文本字符串，避免 codemode 收到原图片或空结果。
-
-工具 description/guidelines 明确说明当前模型不能直接看图，`read` 会调用外挂 vision 模型，返回值是该模型的视觉描述而非当前模型的直接观察。
-
-“实时看到回复”指 TUI 中持续更新一行最新 thinking/reply 摘要，不把完整中间 token stream 永久写入 transcript。
-
-### 错误
-
-- 路径、格式或读取失败：沿用原生 `read` 行为；无法处理成 image content 时不错误触发 fallback。
-- 缺少/错误 vision 配置、模型不支持图片、认证或 provider 错误：返回 `[Vision fallback failed: ...]` 普通文本结果，让主模型能解释或恢复。
-- fallback 最终没有文本：同上。
+- 不检查模型能力以委托视觉模型，不读取 `vision` 配置，不发起嵌套模型请求或显示委托进度。
+- 移除原扩展的 `image.query/detail` 参数；不增加 hashline 或单独的 `view_image` 工具。
+- 对不支持图片的模型，沿用 pi 原生提示和请求处理行为，不再提供兼容读图。
 
 ## MCP
 

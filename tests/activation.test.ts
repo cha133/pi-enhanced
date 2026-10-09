@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { activateEnhancedTools } from "../extensions/lib/activation.js";
 
 describe("tool activation", () => {
-	test("replaces bash with pwsh, keeps enhanced read, and preserves unrelated tools", () => {
+	test("replaces bash with pwsh, keeps native read, and preserves unrelated tools", () => {
 		let active = ["read", "bash", "edit", "write", "third_party"];
 		const pi = {
 			getActiveTools: () => active,
@@ -12,7 +12,7 @@ describe("tool activation", () => {
 		} as any;
 		activateEnhancedTools(pi, {
 			shellName: "pwsh",
-			toolNames: ["pwsh", "read", "edit", "write"],
+			toolNames: ["pwsh", "edit", "write"],
 		});
 		expect(active).toEqual(["read", "edit", "write", "third_party", "pwsh"]);
 	});
@@ -27,10 +27,25 @@ describe("tool activation", () => {
 		} as any;
 		activateEnhancedTools(pi, {
 			shellName: "bash",
-			toolNames: ["bash", "read", "edit", "write"],
+			toolNames: ["bash", "edit", "write"],
 		});
 		expect(active).toContain("read");
 		expect(active).not.toContain("bash");
 		expect(active).toContain("third_party");
+	});
+
+	test("preserves an already disabled native read", () => {
+		let active = ["bash", "edit", "write", "third_party"];
+		const pi = {
+			getActiveTools: () => active,
+			setActiveTools: (names: string[]) => {
+				active = names;
+			},
+		} as any;
+		activateEnhancedTools(pi, {
+			shellName: "bash",
+			toolNames: ["bash", "edit", "write"],
+		});
+		expect(active).toEqual(["bash", "edit", "write", "third_party"]);
 	});
 });

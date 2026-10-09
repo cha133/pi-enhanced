@@ -16,11 +16,11 @@ Read `docs/README.md` first, then open only the design document relevant to the 
 ## Working rules
 
 - Preserve the single-entry package surface declared in `package.json`.
-- Keep `read` active as a same-name override of pi's native reader, adding only automatic vision fallback for text-only models. Do not add hashline behavior or a separate `view_image` tool.
+- Use pi's native `read` without an override and preserve its existing active state. Do not add vision fallback, hashline behavior, or a separate `view_image` tool.
 - Compute active tools from the existing active set and preserve tools registered by other extensions.
 - On Windows, expose `pwsh` only when PowerShell 7 is found; otherwise preserve the enhanced native `bash` path.
 - Preserve `edit` partial-success semantics: classify replacements against one snapshot, reject every member of an overlap group, and commit accepted edits in one write.
-- Propagate cancellation and usage through nested vision calls, clean up resources in all terminal paths, and keep live progress compact.
+- Preserve native read cancellation and rendering; image reads do not make nested model calls.
 - Keep TypeScript strict and follow the existing tab-indented source style.
 - Update the relevant durable documentation whenever behavior, configuration, architecture, or a recorded decision changes. Do not recreate `.agents/docs`; use temporary task notes outside the committed documentation when needed.
 

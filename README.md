@@ -1,6 +1,6 @@
 # pi-enhanced
 
-`pi-enhanced` is a single-entry pi package that keeps pi's native tool surface small while improving file reading and writing, batch editing, and image inspection.
+`pi-enhanced` is a single-entry pi package that keeps pi's native tool surface small while improving file writing, batch editing, and shell workflows.
 
 Requires pi `1.1.0` or newer.
 
@@ -10,11 +10,11 @@ Requires pi `1.1.0` or newer.
 | --- | --- |
 | `pwsh` | On Windows with PowerShell 7, replaces `bash`; loads the user profile, injects `TERM=dumb`, and includes PowerShell and ripgrep guidance. |
 | `bash` | On other systems, keeps pi's native execution and adds ripgrep workflow guidance. |
-| `read` | Replaces pi's reader while preserving native text pagination, image processing, and rendering; text-only models transparently delegate image inspection to the configured vision model. |
+| `read` | Uses pi's native reader unchanged, including text pagination, image attachments, and rendering. |
 | `write` | Temporarily replaces pi's writer with its native contract plus a Bun/Windows workaround for existing read-only parent directories. |
 | `edit` | Replaces pi's edit with partial-success batch replacement. Valid disjoint entries are applied atomically; invalid and overlapping entries are returned by index with bounded previews. |
 
-The built-in `read` and `write` names remain active and are overridden by enhanced definitions. The `write` override is a temporary compatibility fix and should be removed once pi or Bun handles recursive creation of existing read-only Windows directories correctly. There is no separate image-viewing tool.
+`read` uses pi's native definition and keeps its existing active state. `write` remains a same-name override. The `write` override is a temporary compatibility fix and should be removed once pi or Bun handles recursive creation of existing read-only Windows directories correctly. There is no separate image-viewing tool.
 
 The extension also records the first user message's timestamp and first-turn model as fixed session metadata. It reuses that same information after later model switches and when the session is resumed.
 
@@ -38,20 +38,7 @@ The package manifest exposes only `extensions/pi-enhanced.ts`; its internal modu
 
 ## Configuration
 
-No configuration is required for shell, edit, or multimodal image inspection. The optional vision route lives at the top level of `~/.pi/agent/settings.json`:
-
-```json
-{
-  "vision": {
-    "provider": "openai",
-    "model": "image-capable-model-id"
-  }
-}
-```
-
-Trusted projects may override individual fields in `.pi/settings.json`.
-
-- `vision` is required only when the current model cannot consume images. It must resolve to an image-capable model already registered in pi.
+No package-specific configuration is required. Image resizing follows pi's native settings. The former top-level `vision` setting is no longer read by this package and can be removed.
 
 ## Built-in MCP
 
@@ -63,23 +50,7 @@ Pi defaults servers to `codemode` exposure and automatically activates codemode 
 
 ## Image behavior
 
-`read` keeps pi's native `path`, `offset`, and `limit` parameters and adds optional image guidance:
-
-```ts
-{
-  path: string;
-  offset?: number;
-  limit?: number;
-  image?: {
-    query?: string;
-    detail?: "brief" | "standard" | "detailed";
-  };
-}
-```
-
-`image.detail` controls analysis depth, not image resolution. Both direct and delegated paths use pi's automatic aspect-ratio-preserving image resize setting; the tool does not expose an original-resolution mode. Text reads retain native pi behavior without hashline formatting.
-
-For a text-only current model, the result is explicitly described as delegated evidence from the configured vision model. The TUI shows a throttled single-line thinking/reply status while that nested request streams.
+Images are read by pi's native `read` tool and attached for the current model to inspect. Its parameters are `path`, `offset`, and `limit`; the former `image.query/detail` parameters have been removed. Image processing, automatic resizing, structured output, text pagination, errors, and rendering follow pi unchanged. Image reads do not make an additional model request.
 
 ## Edit behavior
 

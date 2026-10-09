@@ -10,13 +10,11 @@ pi-enhanced/
 │   ├── pi-enhanced.ts       # 唯一公开、自动加载的扩展入口
 │   └── lib/                 # 不被 pi 自动发现的内部实现
 │       ├── activation.ts
-│       ├── pwsh.ts
+│       ├── shell.ts
 │       ├── edit.ts
-│       ├── read.ts
 │       ├── write.ts
 │       ├── session-info.ts
-│       ├── session-title.ts
-│       └── settings.ts
+│       └── session-title.ts
 ├── tests/
 ├── docs/
 ├── package.json
@@ -32,14 +30,13 @@ flowchart TD
     A["扩展 factory"] --> B["注册生命周期处理器"]
     B --> C["session_start"]
     C --> D["探测 win32 与 pwsh 7"]
-    D --> E["注册 read、write、edit 与 shell"]
+    D --> E["保留原生 read，注册 write、edit 与 shell"]
     D --> F{"pwsh 可用?"}
     F -->|是| G["注册 pwsh"]
     F -->|否| H["同名覆盖 bash prompt metadata，保留原生执行"]
     G --> I["基于当前 active tools 做最小增删"]
     H --> I
     I --> J["应用有效工具集"]
-    K["model_select"] --> L["刷新 read 的动态 prompt metadata"]
     B --> M["session info: session_start 恢复；before_agent_start 首次捕获并注入"]
     B --> N["session title: 首条消息异步请求当前模型；完成后持久化名称"]
 ```
@@ -52,8 +49,7 @@ flowchart TD
 - 注册同名 `edit` 覆盖执行；active tools 中仍使用名字 `edit`。
 - 注册同名 `write` 覆盖执行；复用原生 definition 并只注入兼容 Bun/Windows `EEXIST` 的本地 operations。官方 pi 或 Bun 修复后删除该临时覆盖。
 - `pwsh` 使用新名字，因此必须先注册，再把 `pwsh` 加入 active tools 并移除 `bash`。
-- `read` 先注册后激活；它以同名 definition 覆盖原生工具，但复用原生 execute/render 能力。
-- `read` 在 `session_start` / `model_select` 按当前模型的 image input 能力重新注册 prompt metadata：多模态路径描述为当前模型亲自查看图片，纯文本路径明确说明会委托外挂 vision 模型并返回其描述。
+- `read` 直接使用 pi 原生工具，保留其现有 active 状态；本包不注册覆盖，也不在模型切换时刷新它。
 - session info 在第一轮 `before_agent_start` 才同时捕获时间与当前模型，并写入 `session-info` custom entry；后续轮次、模型切换和 session resume 始终复用固定 prompt。
 - session title 只处理没有历史用户消息、没有现有名称的新会话。第一轮 `before_agent_start` 立即启动不阻塞主回答的当前模型请求。请求不设置模型输出 token 上限；prompt 要求中文与英文单词混排时保留一个空格，标题长度由 prompt 和返回后的 60 字符清洗共同约束，不对中英文边界做代码改写。完成后通过 `setSessionName()` 持久化，请求失败或纯图片首条消息静默保留 pi 默认名称。
 - fork 不调用标题模型：若继承到名称，则把末尾 ` (n)` 递增，或首次追加 ` (1)`；未命名 fork 保留 pi 默认名称。
@@ -72,8 +68,6 @@ flowchart TD
 
 - PowerShell 7 探测与 prompt guidance。
 - edit 的逐项分类、冲突消解和结果格式化。
-- vision fallback 的模型选择、stream 状态归约和 UI renderer。
-- vision 顶层配置合并与校验。
 
 ## 工具激活协调器
 
@@ -81,7 +75,7 @@ flowchart TD
 
 1. 读取当前 active names。
 2. 始终以增强 `edit` 接管 `edit` 名字（集合中名字不变）。
-3. 始终加入同名覆盖后的 `read` 与 `write`。
+3. 始终加入同名覆盖后的 `write`；`read` 的启用状态保持不变。
 4. 若 pwsh 可用，移除 `bash`、加入 `pwsh`；否则同名注册仅带通用 shell/ripgrep guidance 的 `bash` override、移除可能残留的 `pwsh` 并保留原先 `bash` 状态。
 5. 去重后一次调用 `setActiveTools()`。
 
@@ -93,7 +87,6 @@ flowchart TD
 - `write` 继续使用原生 definition 内的 mutation queue；增强层不改变并发边界。
 - accepted edits 基于同一个原始快照匹配，并在一次 write 中提交，避免逐项写盘导致后续匹配依赖前项。
 - 同一调用中的重叠 edit 不可同时应用；冲突策略见工具契约。
-- vision fallback 接受主调用的 `AbortSignal`，并在终止路径停止 timer 与 stream 订阅。
 - session title 请求同时绑定当前 agent signal 与 session-scoped abort controller；session shutdown、reload 或切换时取消，异步结果写入前再次核对 session id 和当前名称，避免覆盖手工 `/name` 或串写新会话。
 ## 内置 MCP 协作
 
@@ -101,10 +94,10 @@ flowchart TD
 
 ## 兼容性原则
 
-- 当前依赖与最低支持基线为 pi `1.1.0`。原生 read、write、shell wrapper 透传执行上下文；自定义 edit 同样优先使用调用时的 `ctx.cwd`，缺省时回退到构造器目录。
+- 当前依赖与最低支持基线为 pi `1.1.0`。原生 read 由 pi 管理，write、shell wrapper 透传执行上下文；自定义 edit 同样优先使用调用时的 `ctx.cwd`，缺省时回退到构造器目录。
 - 对 pi 的非公开实现复制必须记录上游文件与基线版本。
 - 对公开构造器的返回 shape 做最小 wrapper，不假定未声明字段永久存在。
-- 升级 pi 时重点回归：工具 details shape、renderer 继承、extension lifecycle、SettingsManager、nested usage 与 model stream event。
+- 升级 pi 时重点回归：工具 details shape、renderer 继承、extension lifecycle、原生 read 设置、标题请求 usage 与 model stream event。
 
-- 原生 read 的结构化输出供 codemode 使用；vision fallback 终态必须返回文本 `structuredContent`，并继续传递 usage。
+- 原生 read 的结构化输出供 codemode 使用；本包不修改其结果，也不发起视觉模型调用。
 - edit 的原生 renderer 接收 `outputPad`；部分成功警告遵循该缩进，继续复用原生实际 diff 回填与组件状态。

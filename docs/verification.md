@@ -4,6 +4,13 @@
 
 最后更新：2026-10-09
 
+## 移除读图兼容（2026-10-09）
+
+- 删除 read 覆盖、vision 配置路由、嵌套视觉请求、进度 renderer 和专用测试；read 完全由 pi 原生工具接管。
+- 删除 model_select 中的 read 重新注册；激活测试覆盖保留原生 read 的启用与禁用状态，入口测试覆盖不注册 read 且模型切换保留其他工具。
+- 原 image.query/detail 和 vision 配置不再由本包提供；下方视觉回退验收仅为历史记录。
+- 自动验证：`npm run typecheck`、`npm test`（39 项）、`npm pack --dry-run` 通过；发布包不含 read/vision 实现，仍只有一个扩展入口。
+
 ## pi 1.1.0 升级与内置 MCP 迁移（2026-10-09）
 
 - 四个 pi 开发依赖锁定 `1.1.0`，peer dependencies 最低版本同步提升；对照本地 `../pi` 源码、changelog 和 npm 发布版本检查。
