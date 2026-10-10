@@ -34,11 +34,11 @@ Windows 使用 `createPowerShellToolDefinition`；因原生 `createLocalPowerShe
 - 确认 7+ 时明确指导 `&&` 成功依赖链与 `||` 失败处理，不附加 5.1 兼容限制。
 - 确认 5 时明确禁止 `&&` / `||`，指导立即检查 `$?` 或原生命令的 `$LASTEXITCODE`，以显式 if/throw/exit 控制后续步骤；`$ErrorActionPreference='Stop'` 不能可靠处理原生命令失败。
 - 版本查询失败或无法识别时仍固定使用已选定的可执行文件，不阻断工具注册，明确版本未知，暂用兼容指导，允许模型确认版本后采用对应语法；引用、pipeline 与 rg 搜索指导两套共用。
-- `;` 仅连接无条件步骤，验证与破坏性修改不能以 `;` 串联。
+- `;` 仅连接无条件步骤。
 - 单引号字面量、双引号插值、反引号转义、合法多行 here-string、对象 pipeline 与 `Select-Object` 限制输出；不使用 `Invoke-Expression` 拼装整条命令。
 - `command` 是 JSON 解码后的 PowerShell 源码，JSON 只编码一次；明确区分传输层的 `\"` 与源码中的双引号，禁止用 Bash/C 风格 `\"` 转义 PowerShell 引号或再包一层 `pwsh -Command`。单引号内部用 `''`，双引号内部用反引号转义，并提供实际可执行例子。
 - 嵌套插值先计算或用 `-f` 格式化；复杂代码用原生 write 写入临时脚本再执行，文件内容优先 read/write/edit，避免内联 `bun -e` / `python -c` 的多层引用。原生命令参数传递是另一层引用，5.1 与 7 的行为不同，源码正确不保证内嵌引号原样传递。
-- 破坏性文件操作前在同一 PowerShell 作用域中验证最终绝对路径属于用户授权目录，拒绝空路径、盘符/共享根目录与意外目标；验证失败显式 throw，使用 `Remove-Item` / `Move-Item -LiteralPath -ErrorAction Stop`，不跨 shell 删除。引号不能关闭 `-Path` 通配符；引用/解析错误后先检查源码，不用破坏性命令试错。这些是模型指导，不是执行器的强制安全边界。
+- 文件删除或移动时使用 `-LiteralPath`；递归删除前检查解析后的目标位于预期目录内，路径验证失败则停止。保持为一条针对具体操作的简短指导，不再注入泛化的危险操作措辞或在版本语法指导中重复强调。这是模型指导，不是执行器的强制安全边界。
 - 搜索优先 `rg --files` / `rg -n`，禁止误用 `rg -r` / `rg -rn`。Windows 文件名筛选使用目录 PATH 与 `--glob`，不要将 `dir/*.go` 等 shell 通配路径传给 rg。
 - 非平凡分支、循环或结构化处理转为仓库外临时 TypeScript/Bun 脚本。
 

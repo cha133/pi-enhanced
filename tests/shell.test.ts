@@ -61,11 +61,13 @@ describe("platform shell adaptation", () => {
 		for (const term of ["PowerShell 5.1", "Do not use `&&` or `||`", "$LASTEXITCODE", "$?", "--glob", "Never put shell wildcards in PATH", "Invoke-Expression"]) expect(text).toContain(term);
 	});
 
-	test("quoting and destructive-path guidance reaches every Windows runtime", () => {
+	test("quoting and conditional file-operation guidance reaches every Windows runtime", () => {
 		for (const major of [5, 7, undefined]) {
 			const tool = createEnhancedShell("/repo", "win32", undefined, () => ({ major })).tool;
 			const text = tool.promptGuidelines?.join("\n") ?? "";
-			for (const term of ["after JSON decoding", "Encode JSON once", "'don''t'", "'{0}: {1}' -f", "-LiteralPath", "explicit throw", "Never pass generated paths through cmd /c", "never experiment with destructive commands"]) expect(text).toContain(term);
+			for (const term of ["after JSON decoding", "Encode JSON once", "'don''t'", "'{0}: {1}' -f", "When deleting or moving files", "-LiteralPath", "Before recursive deletion", "stop if path validation fails"]) expect(text).toContain(term);
+			expect(text).not.toContain("destructive");
+			expect(text).not.toContain("user-authorized directory");
 		}
 	});
 
