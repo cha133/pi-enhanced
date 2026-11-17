@@ -68,6 +68,8 @@
 | D-051 | 四个 pi 开发依赖锁定 1.5.2，peer 最低版本同步提升；标题与首消息时间仅由 user turn 初始化，custom turn 只复用时间；edit 使用宿主 keyHint；固定 PowerShell 执行器同步上游 5.1 stderr 退出码修复，保留路径绑定与 profile/TERM 行为 | 用户要求跟进最新 pi；2026-11-17 |
 | D-052 | 保留 edit 同快照分类、重叠组全部拒绝与一次写盘；最小移植 pi 1.5.2 未公开导出的窗口 diff 纯函数，声明 diff@8.0.4 运行依赖，在写入前计算实际 accepted edits 的 diff/patch；fuzzy 范围映射回原始 LF 快照，继续沿用原生 schema/renderer，不改变主要换行风格契约 | 用户要求检查结合新版 edit 的大文件 diff；2026-11-17 |
 
+| D-053 | 删除通用 shell 指导中要求将分支、循环、结构化处理等转为仓库外 TypeScript/Bun 临时脚本的规则；不指定临时脚本语言或运行时，保留 PowerShell 避免复杂内联引用的指导 | 用户要求；2026-11-17 |
+
 ## 待确认决策
 
 无。实现中出现新的兼容性或产品取舍时，从 `Q-011` 继续编号。

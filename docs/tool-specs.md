@@ -40,9 +40,8 @@ Windows 使用 `createPowerShellToolDefinition`；因原生 `createLocalPowerShe
 - 嵌套插值先计算或用 `-f` 格式化；复杂代码用原生 write 写入临时脚本再执行，文件内容优先 read/write/edit，避免内联 `bun -e` / `python -c` 的多层引用。原生命令参数传递是另一层引用，5.1 与 7 的行为不同，源码正确不保证内嵌引号原样传递。
 - 文件删除或移动时使用 `-LiteralPath`；递归删除前检查解析后的目标位于预期目录内，路径验证失败则停止。保持为一条针对具体操作的简短指导，不再注入泛化的危险操作措辞或在版本语法指导中重复强调。这是模型指导，不是执行器的强制安全边界。
 - 搜索优先 `rg --files` / `rg -n`，禁止误用 `rg -r` / `rg -rn`。Windows 文件名筛选使用目录 PATH 与 `--glob`，不要将 `dir/*.go` 等 shell 通配路径传给 rg。
-- 非平凡分支、循环或结构化处理转为仓库外临时 TypeScript/Bun 脚本。
 
-非 Windows 的 bash 保留原生执行与 metadata，仅添加通用 rg 搜索和临时 TypeScript/Bun 工作流指导。
+非 Windows 的 bash 保留原生执行与 metadata，仅添加通用 rg 搜索指导。两种 shell 均不指定临时脚本的语言或运行时。
 
 ## `edit`
 

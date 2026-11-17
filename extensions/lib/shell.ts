@@ -11,7 +11,6 @@ import {
 
 export const COMMON_SHELL_GUIDELINES = [
 	"Prefer rg for search: use `rg --files` for file discovery and `rg -n PATTERN PATH` for recursive content search. Never use grep-style `rg -r` or `rg -rn`; in ripgrep, `-r` means `--replace`.",
-	"Keep simple commands and pipelines in the shell. For branching, loops, structured-data processing, or fragile quoting, write a temporary TypeScript script outside the repository and run it with Bun.",
 ];
 
 export const POWERSHELL_GUIDELINES = [
