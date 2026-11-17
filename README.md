@@ -58,6 +58,8 @@ Every `edits[]` entry is matched against one original file snapshot. Empty, miss
 
 Rejected results include the original array index, an error code/message, and an explicitly incomplete bounded preview. They do not repeat full `oldText` or `newText`; retry only rejected indexes after reviewing the applied diff.
 
+Diffs and patches use pi 1.5.2's windowed algorithm around accepted changes and are computed before writing. This avoids diffing every unchanged line in a large file; reading and matching still require the full file.
+
 ## Development
 
 ```bash

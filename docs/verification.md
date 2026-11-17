@@ -4,6 +4,15 @@
 
 最后更新：2026-11-17
 
+## 部分成功 edit 接入窗口 diff（2026-11-17）
+
+- 升级提交为 `ecfecde`，此节记录其后的 edit 优化。检查 pi 1.5.2 原生 execute 与 edit-diff：原生批量编辑仍为整体成功/失败，不能直接替代本包部分成功语义；`generateEditDiff` 未从 package exports 暴露。
+- 最小移植上游窗口 diff 的纯函数与 MIT 声明到 `extensions/lib/edit-diff.ts`，直接声明 `diff@8.0.4` 运行依赖，无内部模块深路径导入；原生 schema、renderer、队列及部分成功结果结构继续复用。
+- accepted edits 保留原始 LF 快照中的有序 ranges，fuzzy 时只将触及行映射回原始位置。diff/patch 先于写盘生成；保留每个 overlap 成员拒绝、rejected-only 不写盘、BOM/主要换行风格与一次提交。
+- 聚焦回归覆盖远距离插入/删除后全局行号与原生公开 diff helpers 一致、patch 应用结果、NFKC 长度变化后的 fuzzy 范围及同一行多个修改、全部拒绝，以及 20 万行文件中的部分成功落盘和原生渲染；大文件小改动的 diff/patch 均小于 1.5 KB。
+- 自动验证通过：`npm run typecheck`、`npm test`（59 项，0 失败）、`npm pack --dry-run`、`git diff --check`；发布仍为单公开入口。
+- 仍需读取与匹配完整文件；没有声明固定内存或流式编辑。混合换行逐行保留与下节的 PowerShell 私有 timeout 诊断差异不在本轮修改范围内。
+
 ## pi 1.5.2 升级（2026-11-17）
 
 - npm registry 的四个 pi 包 `latest` 均为 `1.5.2`；开发依赖精确锁定此版本，peer 最低版本同步提升，更新 package-lock；单公开入口保持不变。

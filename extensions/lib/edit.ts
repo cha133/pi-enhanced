@@ -3,11 +3,9 @@ import { access, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { Container, Text, type Component } from "@earendil-works/pi-tui";
-import { Type } from "typebox";
+import { generateEditDiff, type TextReplacement } from "./edit-diff.js";
 import {
 	createEditToolDefinition,
-	generateDiffString,
-	generateUnifiedPatch,
 	withFileMutationQueue,
 	type EditToolInput,
 } from "@earendil-works/pi-coding-agent";
@@ -114,7 +112,7 @@ function boundedPreview(oldText: string): EditPreview {
 	};
 }
 
-function applyReplacements(content: string, replacements: Replacement[], offset = 0): string {
+function applyReplacements(content: string, replacements: TextReplacement[], offset = 0): string {
 	let result = content;
 	for (const replacement of [...replacements].sort((a, b) => b.matchIndex - a.matchIndex)) {
 		const index = replacement.matchIndex - offset;
@@ -127,11 +125,11 @@ function splitLinesWithEndings(content: string): string[] {
 	return content.match(/[^\n]*\n|[^\n]+/g) ?? [];
 }
 
-function applyPreservingUnchangedLines(
+function replacementsPreservingUnchangedLines(
 	originalContent: string,
 	matchContent: string,
 	replacements: Replacement[],
-): string {
+): TextReplacement[] {
 	const originalLines = splitLinesWithEndings(originalContent);
 	const matchLines = splitLinesWithEndings(matchContent);
 	if (originalLines.length !== matchLines.length) {
@@ -161,20 +159,25 @@ function applyPreservingUnchangedLines(
 			groups.push({ startLine, endLine: endLine + 1, replacements: [replacement] });
 		}
 	}
-	let result = "";
+	let originalOffset = 0;
 	let originalLine = 0;
-	for (const group of groups) {
-		result += originalLines.slice(originalLine, group.startLine).join("");
+	return groups.map((group) => {
+		for (; originalLine < group.startLine; originalLine++) originalOffset += originalLines[originalLine].length;
+		const matchIndex = originalOffset;
+		for (; originalLine < group.endLine; originalLine++) originalOffset += originalLines[originalLine].length;
 		const start = spans[group.startLine].start;
 		const end = spans[group.endLine - 1].end;
-		result += applyReplacements(matchContent.slice(start, end), group.replacements, start);
-		originalLine = group.endLine;
-	}
-	return result + originalLines.slice(originalLine).join("");
+		return {
+			matchIndex,
+			matchLength: originalOffset - matchIndex,
+			newText: applyReplacements(matchContent.slice(start, end), group.replacements, start),
+		};
+	});
 }
 
 export function applyPartialEdits(content: string, edits: ReplacementInput[]): {
 	newContent: string;
+	replacements: TextReplacement[];
 	applied: Array<{ index: number }>;
 	rejected: RejectedEdit[];
 } {
@@ -245,13 +248,17 @@ export function applyPartialEdits(content: string, edits: ReplacementInput[]): {
 		});
 	}
 
-	const newContent = accepted.length === 0
-		? content
+	// Diff windows need offsets in the original LF snapshot, including when
+	// fuzzy normalization changed character lengths before an accepted edit.
+	const replacements: TextReplacement[] = accepted.length === 0
+		? []
 		: requiresFuzzy
-			? applyPreservingUnchangedLines(content, matchContent, accepted)
-			: applyReplacements(matchContent, accepted);
+			? replacementsPreservingUnchangedLines(content, matchContent, accepted)
+			: [...accepted].sort((a, b) => a.matchIndex - b.matchIndex);
+	const newContent = applyReplacements(content, replacements);
 	return {
 		newContent,
+		replacements,
 		applied: accepted.map(({ index }) => ({ index })).sort((a, b) => a.index - b.index),
 		rejected: rejected.sort((a, b) => a.index - b.index),
 	};
@@ -301,14 +308,16 @@ export function createEnhancedEditTool(cwd: string): ReturnType<typeof createEdi
 				const ending = detectLineEnding(withoutBom);
 				const original = normalizeToLF(withoutBom);
 				const outcome = applyPartialEdits(original, input.edits);
+				// Compute the bounded diff before committing any accepted edits.
+				const diffResult = generateEditDiff(input.path, original, outcome.newContent, outcome.replacements);
+				throwIfAborted();
 				if (outcome.applied.length > 0) {
 					await writeFile(absolutePath, bom + restoreLineEndings(outcome.newContent, ending), "utf8");
 					throwIfAborted();
 				}
-				const diffResult = generateDiffString(original, outcome.newContent);
 				const details: EnhancedEditDetails = {
 					diff: diffResult.diff,
-					patch: generateUnifiedPatch(input.path, original, outcome.newContent),
+					patch: diffResult.patch,
 					firstChangedLine: diffResult.firstChangedLine,
 					applied: outcome.applied,
 					rejected: outcome.rejected,

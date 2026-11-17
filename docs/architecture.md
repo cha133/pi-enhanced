@@ -67,6 +67,7 @@ flowchart TD
 
 - PowerShell 标准 profile 加载、TERM 环境适配、实例级路径/版本缓存与 5.1/7 分开的 prompt guidance；原生未导出的固定路径进程适配保留明确来源。
 - edit 的逐项分类、冲突消解和结果格式化。
+- `edit-diff.ts` 最小移植 pi 1.5.2 未从包入口导出的 `generateEditDiff` 及纯函数依赖，保留上游来源与 MIT 声明，直接依赖同版 `diff@8.0.4`。只对 accepted replacements 周围的窗口做 diff，不绕过 package exports 访问内部模块。
 
 ## 工具激活协调器
 
@@ -85,6 +86,7 @@ flowchart TD
 - `edit` 对同一绝对路径使用 `withFileMutationQueue()` 串行化完整的 read-classify-write 周期。
 - `write` 由 pi 原生工具使用 mutation queue；本包不介入其执行。
 - accepted edits 基于同一个原始快照匹配，并在一次 write 中提交，避免逐项写盘导致后续匹配依赖前项。
+- 分类结果同时保留原始 LF 快照中的有序 replacement ranges；fuzzy 匹配时将触及行映射回原始位置，保留未触及行。写入前根据这些 ranges 计算窗口 diff/patch 并再次检查取消；diff 失败不落盘。文件读取与匹配仍处理完整内容，窗口优化不意味着流式编辑或固定内存开销。
 - 同一调用中的重叠 edit 不可同时应用；冲突策略见工具契约。
 - session title 请求同时绑定当前 agent signal 与 session-scoped abort controller；session shutdown、reload 或切换时取消，异步结果写入前再次核对 session id 和当前名称，避免覆盖手工 `/name` 或串写新会话。
 ## 内置 MCP 协作

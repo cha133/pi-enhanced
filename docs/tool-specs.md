@@ -78,11 +78,13 @@ Windows 使用 `createPowerShellToolDefinition`；因原生 `createLocalPowerShe
 3. 将空 oldText、not found、duplicate、no-op 标为 rejected，其余成为候选。
 4. 候选按文件位置排序并检测重叠。
 5. 重叠组全部拒绝，避免依赖数组顺序悄悄选择赢家；不冲突候选保持 accepted。
-6. 对 accepted 候选按逆序一次性应用并一次写盘。这里“每条正确项单独落盘”指独立决定成功与否，不是执行多次物理写入。
+6. 对 accepted 候选按逆序一次性应用；保留其相对于原始 LF 快照的位置，fuzzy 匹配时将修改范围扩至触及行并映射回原始快照。按范围周围的窗口生成 diff/patch，成功后再次检查取消并一次写盘。这里“每条正确项单独落盘”指独立决定成功与否，不是执行多次物理写入。
 7. 若 accepted 为空，不写文件，返回完整 rejected 信息。
 8. 文件 access/read/write/abort 属于调用级错误，直接抛出；参数级错误不抛出。
 
 这里的“部分成功”以单次文件写入为提交边界：参数错误可局部失败，I/O 错误不可局部成功。
+
+diff 使用 pi 1.5.2 的窗口算法：每个 accepted replacement 周围保留 32 行匹配余量，合并相交窗口，展示 4 行上下文。全局行号与 patch hunk 偏移计入之前的增删行；重复行在窗口内的对齐可能与整文件 diff 不同。只为 accepted 项生成 diff，rejected-only 不写文件、没有 diff hunk。完整文件仍需读取和匹配，超大的替换本身仍会产生相应大小的 diff；继续按既有契约恢复主要换行风格与 BOM。
 
 ### 返回
 

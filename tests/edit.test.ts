@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, test } from "bun:test";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { applyPatch } from "diff";
 import { initTheme, ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { applyPartialEdits, createEnhancedEditTool } from "../extensions/lib/edit.js";
@@ -13,6 +14,34 @@ beforeAll(() => {
 const quietTui = { requestRender() {} } as TUI;
 
 describe("partial edit", () => {
+	test("commits partial edits on a large file with a bounded patch and native rendering", async () => {
+		const cwd = await mkdtemp(join(tmpdir(), "pi-enhanced-edit-large-"));
+		try {
+			const original = Array.from({ length: 200_000 }, (_, i) => `line-${i}: payload`).join("\n") + "\n";
+			const path = join(cwd, "large.txt");
+			await writeFile(path, original);
+			const tool = createEnhancedEditTool(cwd);
+			const args = { path: "large.txt", edits: [
+				{ oldText: "line-199990: payload", newText: "line-199990: updated\nextra line" },
+				{ oldText: "absent", newText: "rejected" },
+			] };
+			const component = new ToolExecutionComponent("edit", "large-call", args, {}, tool, quietTui, cwd);
+			const result = await tool.execute("large-call", args, undefined, undefined, { cwd } as any);
+			const details = result.details as any;
+			expect(details.firstChangedLine).toBe(199991);
+			expect(details.applied).toEqual([{ index: 0 }]);
+			expect(details.rejected).toMatchObject([{ index: 1, code: "not_found" }]);
+			expect(details.patch.length).toBeLessThan(1500);
+			expect(applyPatch(original, details.patch)).toBe(await readFile(path, "utf8"));
+			component.updateResult({ ...result, isError: false });
+			const rendered = component.render(80).join("\n");
+			expect(rendered).toContain("line-199990: updated");
+			expect(rendered).toContain("Applied 1; rejected 1");
+		} finally {
+			await rm(cwd, { recursive: true, force: true });
+		}
+	});
+
 	test("resolves relative paths against the execution context cwd", async () => {
 		const cwd = await mkdtemp(join(tmpdir(), "pi-enhanced-edit-context-"));
 		const otherCwd = await mkdtemp(join(tmpdir(), "pi-enhanced-edit-factory-"));
