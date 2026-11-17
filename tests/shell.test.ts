@@ -213,13 +213,19 @@ describe("platform shell adaptation", () => {
 		for (const value of ["term=dumb", "中文 héllo €", process.cwd()]) expect(text).toContain(value);
 	});
 
-	test.skipIf(process.platform !== "win32")("falls back to 5.1 through the native resolver when 7 is absent from PATH", async () => {
+	test.skipIf(process.platform !== "win32")("falls back to 5.1 when 7 is absent from PATH and installation directories", async () => {
 		const system32 = join(process.env.SystemRoot ?? "C:\\Windows", "System32");
 		const legacyDirectory = join(system32, "WindowsPowerShell", "v1.0");
 		const env = { ...process.env };
 		for (const key of Object.keys(env)) if (key.toLowerCase() === "path") delete env[key];
 		env.PATH = `${system32};${legacyDirectory}`;
+		// pi also discovers PowerShell 7 under ProgramFiles, independently of PATH.
+		for (const key of Object.keys(env)) if (key.toLowerCase() === "programfiles") delete env[key];
+		env.ProgramFiles = join(tmpdir(), "pi-enhanced-no-pwsh-installation");
 		const script = `import { createEnhancedShell } from './extensions/lib/shell.ts';
+			for (const key of Object.keys(process.env)) if (key.toLowerCase() === 'path' || key.toLowerCase() === 'programfiles') delete process.env[key];
+			process.env.PATH = ${JSON.stringify(env.PATH)};
+			process.env.ProgramFiles = ${JSON.stringify(env.ProgramFiles)};
 			const shell = createEnhancedShell(process.cwd());
 			const result = await shell.tool.execute('fallback', { command: "Write-Output ('version=' + $PSVersionTable.PSVersion.Major); Write-Output ('term=' + $env:TERM); Write-Output '中文 héllo €'", timeout: 10 });
 			console.log(JSON.stringify({ ...result, guidelines: shell.tool.promptGuidelines }));`;
@@ -228,6 +234,21 @@ describe("platform shell adaptation", () => {
 		expect(parsed.structuredContent.exit_code).toBe(0);
 		expect(parsed.guidelines.join("\n")).toContain("This tool runs Windows PowerShell 5.1");
 		for (const value of ["version=5", "term=dumb", "中文 héllo €"]) expect(parsed.structuredContent.output).toContain(value);
+	}, 30000);
+
+	test.skipIf(process.platform !== "win32")("5.1 preserves native stderr exit handling and real failures", async () => {
+		const shell = join(process.env.SystemRoot ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+		const operations = createPinnedPowerShellOperations({ shell, args: ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command"] });
+		for (const [command, exitCode] of [
+			['& $env:ComSpec /d /c "echo warning 1>&2 & exit /b 0" 2>&1 | Select-Object -Last 3', 0],
+			['& $env:ComSpec /d /c "echo warning 1>&2 & exit /b 9" 2>&1 | Select-Object -Last 3', 1],
+			["Write-Error 'real failure'", 1],
+			["Get-ChildItem |", 1],
+			["exit 9", 9],
+		] as const) {
+			const result = await operations.exec(command, process.cwd(), { onData: () => {}, timeout: 10 });
+			expect(result.exitCode).toBe(exitCode);
+		}
 	}, 30000);
 
 	test.skipIf(process.platform !== "win32")("loads profiles in order and command scope on 7 and 5.1", async () => {

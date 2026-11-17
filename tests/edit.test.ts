@@ -197,10 +197,12 @@ describe("partial edit", () => {
 					lastComponent: undefined,
 					state: {},
 					outputPad: 3,
+					keyHint: () => "custom-key to expand",
 				} as any,
 			);
 			expect(rendered.render(80)[0]).toContain("Applied 0; rejected 1");
 			expect(rendered.render(80)[0]).toStartWith("   Applied");
+			expect(rendered.render(80)[0]).toContain("custom-key to expand");
 		} finally {
 			await rm(cwd, { recursive: true, force: true });
 		}

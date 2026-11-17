@@ -84,6 +84,24 @@ describe("session title helpers", () => {
 });
 
 describe("session title lifecycle", () => {
+	test("ignores custom turns without consuming the first user title attempt", async () => {
+		const h = harness();
+		let requests = 0;
+		registerSessionTitle(h.pi, (async () => {
+			requests++;
+			return assistant("User title");
+		}) as any);
+		h.handlers.get("session_start")![0]({ reason: "startup" }, h.ctx);
+		const before = h.handlers.get("before_agent_start")![0];
+		before({ messageType: "custom", message: { content: "Background task" } }, h.ctx);
+		await flushPromises();
+		expect(requests).toBe(0);
+		before({ messageType: "user", prompt: "Fix auth" }, h.ctx);
+		await flushPromises();
+		expect(requests).toBe(1);
+		expect(h.names).toEqual(["User title"]);
+	});
+
 	test("requests the first-turn model asynchronously and applies the result", async () => {
 		const h = harness();
 		let resolveRequest!: (value: any) => void;
@@ -98,7 +116,7 @@ describe("session title lifecycle", () => {
 		};
 		registerSessionTitle(h.pi, request as any);
 		h.handlers.get("session_start")![0]({ reason: "startup" }, h.ctx);
-		const result = h.handlers.get("before_agent_start")![0]({ prompt: "请修复登录超时", images: undefined }, h.ctx);
+		const result = h.handlers.get("before_agent_start")![0]({ messageType: "user", prompt: "请修复登录超时", images: undefined }, h.ctx);
 
 		expect(result).toBeUndefined();
 		expect(h.names).toEqual([]);
@@ -116,7 +134,7 @@ describe("session title lifecycle", () => {
 		const request = () => new Promise((resolve) => (resolveRequest = resolve));
 		registerSessionTitle(h.pi, request as any);
 		h.handlers.get("session_start")![0]({ reason: "startup" }, h.ctx);
-		h.handlers.get("before_agent_start")![0]({ prompt: "Fix auth", images: undefined }, h.ctx);
+		h.handlers.get("before_agent_start")![0]({ messageType: "user", prompt: "Fix auth", images: undefined }, h.ctx);
 		await flushPromises();
 		h.setName("Manual title");
 		resolveRequest(assistant("Generated title"));
@@ -134,7 +152,7 @@ describe("session title lifecycle", () => {
 		};
 		registerSessionTitle(h.pi, request as any);
 		h.handlers.get("session_start")![0]({ reason: "startup" }, h.ctx);
-		h.handlers.get("before_agent_start")![0]({ prompt: "Fix auth", images: undefined }, h.ctx);
+		h.handlers.get("before_agent_start")![0]({ messageType: "user", prompt: "Fix auth", images: undefined }, h.ctx);
 		await flushPromises();
 		h.handlers.get("session_shutdown")![0]({ reason: "quit" }, h.ctx);
 		expect(requestSignal?.aborted).toBe(true);
@@ -144,7 +162,7 @@ describe("session title lifecycle", () => {
 		const h = harness();
 		registerSessionTitle(h.pi, (() => Promise.reject(new Error("provider failed"))) as any);
 		h.handlers.get("session_start")![0]({ reason: "startup" }, h.ctx);
-		const result = h.handlers.get("before_agent_start")![0]({ prompt: "Fix auth", images: undefined }, h.ctx);
+		const result = h.handlers.get("before_agent_start")![0]({ messageType: "user", prompt: "Fix auth", images: undefined }, h.ctx);
 		await flushPromises();
 		expect(result).toBeUndefined();
 		expect(h.names).toEqual([]);
@@ -168,7 +186,7 @@ describe("session title lifecycle", () => {
 		const h = harness({ entries: [{ type: "message", message: { role: "user" } }] });
 		registerSessionTitle(h.pi);
 		h.handlers.get("session_start")![0]({ reason: "resume" }, h.ctx);
-		h.handlers.get("before_agent_start")![0]({ prompt: "second", images: undefined }, h.ctx);
+		h.handlers.get("before_agent_start")![0]({ messageType: "user", prompt: "second", images: undefined }, h.ctx);
 		expect(h.names).toEqual([]);
 	});
 
@@ -177,8 +195,8 @@ describe("session title lifecycle", () => {
 		registerSessionTitle(h.pi);
 		h.handlers.get("session_start")![0]({ reason: "startup" }, h.ctx);
 		const before = h.handlers.get("before_agent_start")![0];
-		before({ prompt: "C:\\images\\screen.png", images: [{ type: "image" }] }, h.ctx);
-		before({ prompt: "Please fix the bug", images: undefined }, h.ctx);
+		before({ messageType: "user", prompt: "C:\\images\\screen.png", images: [{ type: "image" }] }, h.ctx);
+		before({ messageType: "user", prompt: "Please fix the bug", images: undefined }, h.ctx);
 		expect(h.names).toEqual([]);
 	});
 

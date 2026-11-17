@@ -23,14 +23,14 @@
 
 沿用原生 `{ command: string; timeout?: number }`（timeout 单位秒）、outputSchema、structuredContent、调用时 cwd、streaming、timeout、abort、进程树终止、输出截断和 renderer。
 
-Windows 使用 `createPowerShellToolDefinition`；因原生 `createLocalPowerShellOperations` 不支持固定路径且每次调用重新查找，operations 使用以 pi 1.1.0 原生进程执行实现为来源的最小适配，绑定初始化选定的可执行文件。保留原生 `-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command` 参数和 UTF-8 初始化，在同一命令作用域中依次 dot-source 存在的标准 profile：AllUsersAllHosts、AllUsersCurrentHost、CurrentUserAllHosts、CurrentUserCurrentHost。缺失 profile 跳过；profile 的输出和错误遵循 PowerShell 原生语义。进程启动前注入 `TERM=dumb`，profile 初始化可看到此环境变量；不修改用户 profile 或 settings。
+Windows 使用 `createPowerShellToolDefinition`；因原生 `createLocalPowerShellOperations` 不支持固定路径且每次调用重新查找，operations 使用以 pi 1.1.0 原生进程执行实现为来源的最小适配，绑定初始化选定的可执行文件。同步 pi 1.5.2 的 5.1 退出码修正：原生命令成功但重定向 stderr 形成 NativeCommandError 时返回成功；保留真实失败、显式 exit、语法错误及尾随反引号语义。保留原生 `-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command` 参数和 UTF-8 初始化，在同一命令作用域中依次 dot-source 存在的标准 profile：AllUsersAllHosts、AllUsersCurrentHost、CurrentUserAllHosts、CurrentUserCurrentHost。缺失 profile 跳过；profile 的输出和错误遵循 PowerShell 原生语义。进程启动前注入 `TERM=dumb`，profile 初始化可看到此环境变量；不修改用户 profile 或 settings。
 
 ### Prompt guidance
 
 原生 `powershell` 的指导只有 PI_* 环境信息。本包保留其 metadata 并补充：
 
 - description、promptSnippet 与 promptGuidelines 明示当前会话选定的实际版本；description 同时显示执行路径，不再描述“可能回退到 5.1”。版本未知时明确未知，不伪称 5.1。环境变量使用 `$env:NAME`，路径检查用 `Test-Path`，引用的可执行路径用 `&`。
-- Windows 初始化时通过原生 `getPowerShellConfig()` 选择可执行文件，并用原生无 profile 参数查询 `$PSVersionTable.PSVersion.Major`。查询进程 timeout 为 5 秒，限制输出为 1 KB，不加载 profile、不显示窗口；可执行文件、参数、版本及失败均在扩展实例内缓存，reload 后重新探测，非 Windows 不探测。
+- Windows 初始化时通过原生 `getPowerShellConfig()` 选择可执行文件（7 的 PATH、ProgramFiles 标准安装目录优先，再尝试 5.1 的 PATH 与 SystemRoot 标准目录），并用原生无 profile 参数查询 `$PSVersionTable.PSVersion.Major`。查询进程 timeout 为 5 秒，限制输出为 1 KB，不加载 profile、不显示窗口；可执行文件、参数、版本及失败均在扩展实例内缓存，reload 后重新探测，非 Windows 不探测。
 - 确认 7+ 时明确指导 `&&` 成功依赖链与 `||` 失败处理，不附加 5.1 兼容限制。
 - 确认 5 时明确禁止 `&&` / `||`，指导立即检查 `$?` 或原生命令的 `$LASTEXITCODE`，以显式 if/throw/exit 控制后续步骤；`$ErrorActionPreference='Stop'` 不能可靠处理原生命令失败。
 - 版本查询失败或无法识别时仍固定使用已选定的可执行文件，不阻断工具注册，明确版本未知，暂用兼容指导，允许模型确认版本后采用对应语法；引用、pipeline 与 rg 搜索指导两套共用。
@@ -122,7 +122,7 @@ details：
 - 结果落定后把实际落盘 diff 回填到调用区域；部分成功时以实际 diff 替换可能基于完整输入产生的调用期预览或预检错误。
 - 部分成功使用成功/警告语义，不显示成全红失败；警告放在原生 edit 调用框内、实际 diff 下方。
 - rejected-only 结果复用原生调用框的 header/body 间距，不渲染空 diff 行或框外空行。
-- rejected 摘要在折叠视图仅显示 applied/rejected 数量和 `Ctrl+O` 提示，expanded 展示每项索引、reason code 与原因。
+- rejected 摘要在折叠视图仅显示 applied/rejected 数量和宿主 `context.keyHint()` 提供的展开快捷键提示，expanded 展示每项索引、reason code 与原因。
 
 ## `read`
 

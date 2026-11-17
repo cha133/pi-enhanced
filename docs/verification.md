@@ -2,7 +2,26 @@
 
 版本：`0.1.0`
 
-最后更新：2026-10-10
+最后更新：2026-11-17
+
+## pi 1.5.2 升级（2026-11-17）
+
+- npm registry 的四个 pi 包 `latest` 均为 `1.5.2`；开发依赖精确锁定此版本，peer 最低版本同步提升，更新 package-lock；单公开入口保持不变。
+- 检查上游 [v1.1.0...v1.5.2](https://github.com/earendil-works/pi/compare/v1.1.0...v1.5.2) 的四个包 changelog，并核对工具、扩展事件、shell 解析器、进程生命周期及实际安装的发布包。版本间影响如下：
+
+| 版本 | 与本插件相关的改动与处理 |
+| --- | --- |
+| 1.2.0 | `before_agent_start` 按 `messageType` 区分 user/custom。标题只处理 user，custom 不消耗首次尝试；session info 只在 user 首次捕获，后续 custom 仍注入已有固定时间。TUI cursor APC 变化不影响本包使用的 Container/Text。 |
+| 1.3.0 | 移除实验性 AssistantMessageFrame API；本包未使用，无需迁移。 |
+| 1.4.0 | 原生 PowerShell 查找新增 ProgramFiles 7 / SystemRoot 5.1 安装目录，继续使用其解析器；5.1 fallback 测试隔离 PATH 和 ProgramFiles。telemetry、User-Agent、transcript tools 的破坏性变更均未涉及本包调用。 |
+| 1.5.0 | 参数校验迁移到 pi-schema；本包沿用原生标准 JSON Schema，无 TypeBox refinement/codec 等依赖，无需迁移。edit 展开提示改用 renderer context 注入的 keyHint，避免读到扩展自身依赖副本的快捷键。 |
+| 1.5.1 | 固定路径 PowerShell operations 同步上游 5.1 stderr 重定向误报退出码修复。原生 read 大文件流式读取、write 与供应商修复直接由 pi 提供；grep operations 改动不涉及本包。标题 complete/compat、认证 headers/env/signal 与返回消息仍兼容，标题请求没有历史工具调用，不受 tools 空数组改动影响，也未设置 sessionId 使用主会话的 Anthropic continuation。 |
+| 1.5.2 | 缺失目录的会话 fork/import 行为由宿主管理；保留本包 fork 标题后缀与执行时 ctx.cwd 处理。 |
+
+- 仍保留的实现差异：本包 edit 使用自己的部分成功算法和公开 diff helpers，继续按契约恢复主要换行风格，未引入上游新的逐行混合换行保留和限定变更范围 diff；大文件 diff 仍在写入后计算，不声称继承上游该项内存优化。固定 PowerShell operations 继续使用 `timeout:<seconds>` 自定义后端协议；上游新增的私有 ShellTimeoutError 背景进程退出时间诊断不会通过此后端产生，timeout/abort 与清理语义不变。
+- 新增回归覆盖 custom turn 后用户首轮标题、固定时间捕获/复用和 Windows 5.1 的 stderr 成功、非零退出、真实错误、语法错误、显式 exit；edit 验证注入的快捷键文本。
+- 自动验证通过：`npm run typecheck`、`npm test`（54 项，0 失败）、`npm pack --dry-run`；发布包仍仅声明一个扩展入口。`npm ls --depth=0` 确认四个直接 pi 依赖均为 1.5.2。
+- 未运行真实模型请求、交互 TUI 人工验收或非 Windows 实机测试；测试不依赖用户凭据或外部模型。
 
 ## 文件操作指导精简与真实 CLI 问候测试（2026-10-10）
 

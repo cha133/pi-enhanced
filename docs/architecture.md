@@ -49,8 +49,8 @@ flowchart TD
 - `write` 直接使用 pi 原生工具；本包不注册覆盖，保留其现有 active 状态。
 - Windows 同名适配 `powershell`，通过 operations 包装显式加载标准 profiles，spawnHook 设置 TERM=dumb；保留原生 UTF-8、执行参数与 PS> renderer；原生 operations 未提供固定路径 API，因此 powershell-process.ts 记录来源并适配 pi 1.1.0 的 process lifecycle 与 stdio drain，保留流式、超时、取消和 taskkill 进程树清理。session_shutdown 清理本包跟踪的运行进程。
 - `read` 直接使用 pi 原生工具，保留其现有 active 状态；本包不注册覆盖，也不在模型切换时刷新它。
-- session info 在第一轮 `before_agent_start` 捕获时间与时区，并写入 `session-info` custom entry；通过 pi 1.1.0 的 `event.systemPromptOptions.sections.session_info` 注入，不返回整段 `systemPrompt`，保留原生结构化提示词机制和其他扩展的 sections。后续轮次和 session resume 始终复用固定时间/时区，不依赖或注入模型信息。恢复旧版 custom entry 时只提取原始时间行，并重建不含模型信息的 prompt；不改写历史 entry，也不重新捕获时间。
-- session title 只处理没有历史用户消息、没有现有名称的新会话。第一轮 `before_agent_start` 立即启动不阻塞主回答的当前模型请求。请求不设置模型输出 token 上限；prompt 要求中文与英文单词混排时保留一个空格，标题长度由 prompt 和返回后的 60 字符清洗共同约束，不对中英文边界做代码改写。完成后通过 `setSessionName()` 持久化，请求失败或纯图片首条消息静默保留 pi 默认名称。
+- session info 在第一轮 `before_agent_start` 捕获时间与时区，并写入 `session-info` custom entry；通过 `event.systemPromptOptions.sections.session_info` 注入；仅在 `messageType === "user"` 时首次捕获，custom turn 只复用已有元数据，不返回整段 `systemPrompt`，保留原生结构化提示词机制和其他扩展的 sections。后续轮次和 session resume 始终复用固定时间/时区，不依赖或注入模型信息。恢复旧版 custom entry 时只提取原始时间行，并重建不含模型信息的 prompt；不改写历史 entry，也不重新捕获时间。
+- session title 只处理没有历史用户消息、没有现有名称的新会话。首个用户消息的 `before_agent_start` 立即启动（跳过 custom 消息，不消耗首次尝试）不阻塞主回答的当前模型请求。请求不设置模型输出 token 上限；prompt 要求中文与英文单词混排时保留一个空格，标题长度由 prompt 和返回后的 60 字符清洗共同约束，不对中英文边界做代码改写。完成后通过 `setSessionName()` 持久化，请求失败或纯图片首条消息静默保留 pi 默认名称。
 - fork 不调用标题模型：若继承到名称，则把末尾 ` (n)` 递增，或首次追加 ` (1)`；未命名 fork 保留 pi 默认名称。
 
 ## 复用边界
@@ -93,7 +93,7 @@ flowchart TD
 
 ## 兼容性原则
 
-- 当前依赖与最低支持基线为 pi `1.1.0`。原生 read、write 由 pi 管理，shell wrapper 透传执行上下文；自定义 edit 同样优先使用调用时的 `ctx.cwd`，缺省时回退到构造器目录。
+- 当前依赖与最低支持基线为 pi `1.5.2`。原生 read、write 由 pi 管理，shell wrapper 透传执行上下文；自定义 edit 同样优先使用调用时的 `ctx.cwd`，缺省时回退到构造器目录。
 - 对 pi 的非公开实现复制必须记录上游文件与基线版本。
 - 对公开构造器的返回 shape 做最小 wrapper，不假定未声明字段永久存在。
 - 升级 pi 时重点回归：工具 details shape、renderer 继承、extension lifecycle、原生 read 设置、标题请求 usage 与 model stream event。

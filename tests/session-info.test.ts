@@ -9,6 +9,7 @@ type Handler = (...args: any[]) => any;
 
 function promptEvent() {
 	return {
+		messageType: "user",
 		systemPrompt: "base",
 		systemPromptOptions: {
 			cwd: "/project",
@@ -39,6 +40,27 @@ function harness(entries: unknown[] = []) {
 }
 
 describe("session info", () => {
+	test("custom turns only reuse metadata captured from a user turn", () => {
+		const h = harness();
+		let captures = 0;
+		registerSessionInfo(h.pi, () => {
+			captures++;
+			return new Date("2026-11-17T00:00:00.000Z");
+		}, () => "UTC");
+		h.handlers.get("session_start")![0]({}, h.ctx);
+		const before = h.handlers.get("before_agent_start")![0];
+		const custom = { ...promptEvent(), messageType: "custom" };
+		before(custom, h.ctx);
+		expect(captures).toBe(0);
+		expect(custom.systemPromptOptions.sections.session_info).toBeUndefined();
+		const user = promptEvent();
+		before(user, h.ctx);
+		before(custom, h.ctx);
+		expect(captures).toBe(1);
+		expect(h.appended).toHaveLength(1);
+		expect(custom.systemPromptOptions.sections.session_info).toBe(user.systemPromptOptions.sections.session_info);
+	});
+
 	test("formats fixed datetime and timezone without model metadata", () => {
 		const prompt = formatSessionInfo("2026-08-02T04:05:06.000Z", "Asia/Shanghai")!;
 		expect(prompt).toContain("2026-08-02 12:05:06 (Asia/Shanghai; 2026-08-02T04:05:06.000Z)");

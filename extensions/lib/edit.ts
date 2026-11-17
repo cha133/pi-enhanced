@@ -8,7 +8,6 @@ import {
 	createEditToolDefinition,
 	generateDiffString,
 	generateUnifiedPatch,
-	keyHint,
 	withFileMutationQueue,
 	type EditToolInput,
 } from "@earendil-works/pi-coding-agent";
@@ -338,7 +337,7 @@ export function createEnhancedEditTool(cwd: string): ReturnType<typeof createEdi
 			const summary = `Applied ${applied}; rejected ${rejected.length}`;
 			const output = options.expanded
 				? [summary, ...rejected.map((item) => `edits[${item.index}] (${item.code}): ${item.message}`)].join("\n")
-				: `${summary} · ${keyHint("app.tools.expand", "to expand")}`;
+				: `${summary} · ${context.keyHint("app.tools.expand", "to expand")}`;
 			const callComponent = (context.state as {
 				callComponent?: {
 					children: Component[];

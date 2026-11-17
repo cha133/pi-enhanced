@@ -92,7 +92,7 @@ export function registerSessionInfo(
 	});
 
 	pi.on("before_agent_start", (event) => {
-		initializePrompt();
+		if (event.messageType === "user") initializePrompt();
 		if (!prompt) return;
 		event.systemPromptOptions.sections.session_info = prompt;
 	});

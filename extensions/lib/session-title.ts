@@ -138,6 +138,7 @@ export function registerSessionTitle(pi: ExtensionAPI, request: typeof complete 
 	});
 
 	pi.on("before_agent_start", (event, ctx) => {
+		if (event.messageType !== "user") return;
 		if (attempted || hasPriorUserMessage || pi.getSessionName()) return;
 		attempted = true;
 		if (!ctx.model || !controller || !sessionId || !hasMeaningfulTitleSource(event.prompt, event.images)) return;

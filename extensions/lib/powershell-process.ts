@@ -1,11 +1,12 @@
-// Adapted from pi 1.1.0 core/tools/bash.ts and utils/child-process.ts.
+// Adapted from pi 1.1.0 core/tools/bash.ts and utils/child-process.ts;
+// PowerShell 5.1 exit handling synchronized with pi 1.5.2 core/tools/powershell.ts.
 // pi's public PowerShell operations do not accept a fixed executable. Keep the
 // native process lifecycle here while binding execution to the probed config.
 import { spawn, type ChildProcess } from "node:child_process";
 import { constants } from "node:fs";
 import { access as fsAccess } from "node:fs/promises";
 import { constants as osConstants } from "node:os";
-import { join } from "node:path";
+import { join, win32 } from "node:path";
 import type { getPowerShellConfig, PowerShellOperations } from "@earendil-works/pi-coding-agent";
 
 type ShellConfig = ReturnType<typeof getPowerShellConfig>;
@@ -31,9 +32,12 @@ export function killPinnedPowerShellProcesses(): void {
 
 export function createPinnedPowerShellOperations(config: ShellConfig): PowerShellOperations {
 	const operations = createPinnedShellOperations({ ...config, args: [...config.args] });
+	// 5.1 reports redirected native stderr as a failed statement even on exit 0.
+	// Keep parse errors and trailing backtick behavior identical to native pi.
+	const exitSuffix = '\n;\nif ($?) { exit 0 }\nif (($LASTEXITCODE -eq 0) -and ("$($Error[0].FullyQualifiedErrorId)" -like "NativeCommandError*")) { exit 0 }\nexit 1';
 	return {
 		exec: (command, cwd, options) => operations.exec(
-			`try { [Console]::OutputEncoding=[System.Text.Encoding]::UTF8 } catch {}\n${command}`, cwd, options),
+			`try { [Console]::OutputEncoding=[System.Text.Encoding]::UTF8 } catch {}\n${command}${win32.basename(config.shell).toLowerCase() === "powershell.exe" && !command.endsWith("`") ? exitSuffix : ""}`, cwd, options),
 	};
 }
 

@@ -69,6 +69,7 @@ describe("single extension entry", () => {
 			expect(active).toContain("mcp__exa__web_search_exa");
 			expect([...tools.keys()].some((name) => name.startsWith("mcp_"))).toBe(false);
 			const promptEvent = {
+				messageType: "user",
 				systemPrompt: "base",
 				systemPromptOptions: { sections: {} as Record<string, string> },
 			};
